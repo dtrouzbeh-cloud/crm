@@ -1,3 +1,9 @@
-// Faz faz eklenen modüller burada kaydedilir (klinik, teklif, ödeme, WhatsApp, entegrasyonlar…)
+// Faz faz eklenen modüller burada kaydedilir
 import type { FastifyInstance } from "fastify";
-export async function registerModules(_app: FastifyInstance): Promise<void> {}
+import { catalogRoutes } from "./routes/catalog.ts";
+import { caseRoutes } from "./routes/cases.ts";
+import { quoteRoutes } from "./routes/quotes.ts";
+import { publicRoutes } from "./routes/public.ts";
+export async function registerModules(app: FastifyInstance): Promise<void> {
+  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app);
+}
