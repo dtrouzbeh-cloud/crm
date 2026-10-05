@@ -11,6 +11,7 @@ import { vcol } from "@dentaflow/core/chart";
 import { DealInvoices } from "../components/Invoice.tsx";
 import { AmendmentsPanel } from "../components/Amendments.tsx";
 import { CustomFieldsCard } from "./settings/Fields.tsx";
+import { DealClinicalTab } from "../components/ClinicalPanels.tsx";
 
 const stageLabel = (t: (k: string, p?: any) => string, s: string) => s.startsWith("visit_") ? t("ds_v", { n: s.slice(6) }) : t("ds_" + s);
 
@@ -65,7 +66,7 @@ function DealDrawer({ id, onClose }: { id: string; onClose: () => void }) {
       <div className="card kpi"><span className="l">{t("paid")}</span><span className="v num" style={{ fontSize: 20, color: "var(--ok)" }}>{M(paid)}</span></div>
       <div className="card kpi"><span className="l">{t("balance")}</span><span className="v num" style={{ fontSize: 20 }}>{d.valueMinor != null ? M(Number(d.valueMinor) - paid) : "•••"}</span></div></div>
     <div className="small muted"><Link href={`/leads/${d.leadId}`} onClick={onClose}>{t("lead")} →</Link>{d.caseId && <> · <Link href={`/cases/${d.caseId}`} onClick={onClose}>{t("case")} →</Link></>}{d.quoteId && <> · <Link href={`/quotes/${d.quoteId}`} onClick={onClose}>{t("quote")} →</Link></>} · {d.ownerName ?? ""}</div>
-    <div className="tabs">{["money", "visits", "trip", "plan"].map((k) => <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t("dt_" + k)}</button>)}</div>
+    <div className="tabs">{["money", "visits", "trip", "plan", "clinical"].map((k) => <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t("dt_" + k)}</button>)}</div>
     {tab === "money" && <>
       {can("payment.record") && <><h3>{t("record_payment")}</h3><div className="row wrap"><input className="inp" type="number" placeholder={`${t("amount")} (${d.currency})`} style={{ width: 140 }} value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} />
         <select className="inp" style={{ width: "auto" }} value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>{["cash", "pos", "card", "bank_transfer", "paypal", "link", "other"].map((m) => <option key={m} value={m}>{t("pmeth_" + m)}</option>)}</select>
@@ -90,6 +91,7 @@ function DealDrawer({ id, onClose }: { id: string; onClose: () => void }) {
         <td><select className="inp sm" style={{ width: "auto" }} value={v.status} disabled={!can("deal.write")} onChange={(e) => patch(`/api/deals/${id}/visits/${v.visitNo}`, { status: e.target.value }).then(refresh)}>{["planned", "scheduled", "arrived", "in_treatment", "done", "canceled"].map((s) => <option key={s} value={s}>{t("vs_" + s)}</option>)}</select></td>
         <td className="r num">{M(v.plannedMinor)}{Number(v.upsellMinor) > 0 && <div className="tiny" style={{ color: "var(--ok)" }}>+{M(v.upsellMinor)}</div>}</td><td className="r num">{M(v.paidMinor)}</td></tr>)}</tbody></table>}
     {tab === "trip" && <TripEditor data={data} refresh={refresh} />}
+    {tab === "clinical" && <DealClinicalTab deal={{ ...data.deal, phone: d.phone }} />}
     {tab === "plan" && <><PlanProgress data={data} refresh={refresh} /><AmendmentsPanel deal={data.deal} visits={data.visits} phone={d.phone} /></>}
   </Drawer>;
 }
