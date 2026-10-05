@@ -24,7 +24,7 @@ export const TOOLS: Tool[] = [
   { name: "get_quote_link", description: "Hastanın hazırlanmış bir teklifi varsa bağlantısını getir.", input_schema: { type: "object", properties: {} } },
 ];
 
-async function knowledge(tx: Tx, clinicId: string, agent: any) {
+export async function knowledge(tx: Tx, clinicId: string, agent: any) {
   const [cl] = await tx`select name, city, country, phone, website, default_currency, settings from clinics where id = ${clinicId}`;
   const cur = cl!.defaultCurrency as string; const lines: string[] = [];
   lines.push(`Klinik: ${cl!.name}${cl!.city ? ", " + cl!.city : ""}${cl!.country ? " (" + cl!.country + ")" : ""}. Telefon: ${cl!.phone ?? "-"}. Web: ${cl!.website ?? "-"}.`);
@@ -68,7 +68,7 @@ ${kb}`;
 }
 
 /** Konuşma geçmişini modele uygun role dizisine çevir (ilk mesaj kullanıcı olmalı, ardışık roller birleşir) */
-async function history(tx: Tx, conversationId: string): Promise<Msg[]> {
+export async function history(tx: Tx, conversationId: string): Promise<Msg[]> {
   const rows = (await tx`select direction, body, type from messages where conversation_id = ${conversationId} and direction in ('in','out') order by id desc limit 24`).reverse();
   const out: Msg[] = [];
   for (const r of rows) {
@@ -80,7 +80,7 @@ async function history(tx: Tx, conversationId: string): Promise<Msg[]> {
   return out;
 }
 
-async function trackUsage(clinicId: string, purpose: string, model: string, u: { input: number; output: number }) {
+export async function trackUsage(clinicId: string, purpose: string, model: string, u: { input: number; output: number }) {
   await ownerSql`insert into ai_usage (clinic_id, day, purpose, calls, tokens_in, tokens_out, cost_micro) values (${clinicId}, current_date, ${purpose}, 1, ${u.input}, ${u.output}, ${costMicro(model, u)})
     on conflict (clinic_id, day, purpose) do update set calls = ai_usage.calls + 1, tokens_in = ai_usage.tokens_in + excluded.tokens_in, tokens_out = ai_usage.tokens_out + excluded.tokens_out, cost_micro = ai_usage.cost_micro + excluded.cost_micro`;
 }
@@ -198,16 +198,30 @@ export async function shouldAutoReply(clinicId: string, conversationId: string):
   return online ? { ok: false, reason: "reps_online" } : { ok: true, mode: "auto" };
 }
 
-/** İşçi: gelen WhatsApp mesajında AI işi kuyruğa al (aynı konuşmada bekleyen iş varsa ekleme — art arda mesajlar tek cevapta toplanır) */
+/** Konuşma için AI işini kuyruğa al: otomatik cevap → ai.reply; insan cevaplayacaksa → canlı koç (ai.coach); koç kapalı + asistan modu → taslak */
+export async function queueAi(clinicId: string, conv: string) {
+  const [ag] = await ownerSql`select mode, features, active from ai_agents where clinic_id = ${clinicId} and kind = 'text'`;
+  if (!ag?.active) return;
+  const d = await shouldAutoReply(clinicId, conv);
+  const pend = async (type: string) => (await ownerSql`select 1 from jobs where type = ${type} and done_at is null and payload->>'conversationId' = ${conv} limit 1`).length > 0;
+  if (d.ok && d.mode === "auto") { if (!(await pend("ai.reply"))) await ownerSql`insert into jobs (clinic_id, type, payload, run_at, max_attempts) values (${clinicId}, 'ai.reply', ${ownerSql.json({ conversationId: conv } as never)}, now() + interval '12 seconds', 2)`; return; }
+  const coach = (ag.features as any)?.coach !== false;
+  if (coach) {
+    if (!(await aiAvailable(clinicId)) || (await overCap(clinicId))) return;
+    if (!(await pend("ai.coach"))) await ownerSql`insert into jobs (clinic_id, type, payload, run_at, max_attempts) values (${clinicId}, 'ai.coach', ${ownerSql.json({ conversationId: conv } as never)}, now() + interval '8 seconds', 2)`;
+    return;
+  }
+  if (d.ok && d.mode === "assist" && !(await pend("ai.reply"))) await ownerSql`insert into jobs (clinic_id, type, payload, run_at, max_attempts) values (${clinicId}, 'ai.reply', ${ownerSql.json({ conversationId: conv } as never)}, now() + interval '12 seconds', 2)`;
+}
+
+/** İşçi: gelen mesaj olayında AI işini yönlendir */
 export async function aiHooks(ev: { clinicId: string; type: string; payload: Record<string, unknown> }) {
   if ((ev.type !== "wa.message" && ev.type !== "chat.message") || !ev.payload.conversationId) return;
   const conv = ev.payload.conversationId as string;
-  const [last] = await ownerSql`select body from messages where conversation_id = ${conv} and direction = 'in' order by id desc limit 1`;
+  const [last] = await ownerSql`select body, type from messages where conversation_id = ${conv} and direction = 'in' order by id desc limit 1`;
   if (/^\s*(stop|dur|unsubscribe|abmelden)\s*[.!]*\s*$/i.test(String(last?.body ?? ""))) return;
-  const d = await shouldAutoReply(ev.clinicId, conv); if (!d.ok) return;
-  const [pending] = await ownerSql`select 1 from jobs where type = 'ai.reply' and done_at is null and payload->>'conversationId' = ${conv} limit 1`;
-  if (pending) return;
-  await ownerSql`insert into jobs (clinic_id, type, payload, run_at, max_attempts) values (${ev.clinicId}, 'ai.reply', ${ownerSql.json({ conversationId: conv } as never)}, now() + interval '12 seconds', 2)`;
+  if (last?.type === "audio" && !last.body) return;   // sesli mesaj: döküm işi bitince AI kuyruğa alınır
+  await queueAi(ev.clinicId, conv);
 }
 
 /** İş: cevabı üret; asistan modunda taslak, otomatikte gönder */

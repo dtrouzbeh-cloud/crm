@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
-import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx, qbool } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { randomToken, sha256, encrypt, decrypt } from "../lib/crypto.ts";
 import { addToPipeline } from "../services/pipelines.ts";
@@ -40,7 +40,7 @@ export function clinicalRoutes(app: FastifyInstance) {
       (o.status not in ('delivered','canceled') and o.due_at is not null and exists (select 1 from deal_visits v where v.deal_id = o.deal_id and v.visit_no = o.visit_no and v.arrival_at is not null and o.due_at > v.arrival_at - interval '1 day')) as at_risk
     from lab_orders o join leads l on l.id = o.lead_id join patients p on p.id = l.patient_id left join labs lb on lb.id = o.lab_id left join deals d on d.id = o.deal_id`;
   app.get("/api/lab-orders", async (req) => {
-    const c = clinicalRead(ctx(req)); const q = parse(z.object({ status: z.string().optional(), dealId: z.uuid().optional(), leadId: z.uuid().optional(), open: z.coerce.boolean().optional() }), req.query);
+    const c = clinicalRead(ctx(req)); const q = parse(z.object({ status: z.string().optional(), dealId: z.uuid().optional(), leadId: z.uuid().optional(), open: qbool.optional() }), req.query);
     return withClinic(c.clinicId, (tx) => tx`${orderSelect(tx)} where true ${q.status ? tx`and o.status = ${q.status}` : tx``} ${q.dealId ? tx`and o.deal_id = ${q.dealId}` : tx``} ${q.leadId ? tx`and o.lead_id = ${q.leadId}` : tx``}
       ${q.open ? tx`and o.status not in ('delivered','canceled')` : tx``} order by coalesce(o.due_at, o.created_at) limit 500`);
   });

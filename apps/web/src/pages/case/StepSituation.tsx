@@ -5,6 +5,7 @@ import { toastErr, confirmBox } from "../../components/ui.tsx";
 import { Icon } from "../../components/Icon.tsx";
 import { Chart } from "../../components/Chart.tsx";
 import { Upload } from "../../components/Upload.tsx";
+import { AiAssess } from "../../components/AiAssess.tsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useCan } from "../../lib/auth.ts";
 import { toothStates, SITUATIONS, UPPER, LOWER, jawOf, type Catalog, type Situation } from "@dentaflow/core/engine";
@@ -59,6 +60,7 @@ export default function StepSituation({ data, cat, onDone }: { data: any; cat: C
         {k.dentistNote && <div className="note"><b>{t("dentist_note")}:</b> {k.dentistNote}</div>}
         <div className="tiny muted">📷 {t("photos")}</div><Upload kind="photo" entity="case" entityId={k.id} files={data.files} onDone={() => qc.invalidateQueries({ queryKey: ["case", k.id] })} accept="image/*" />
         <div className="tiny muted">🩻 X-ray / CBCT</div><Upload kind="xray" entity="case" entityId={k.id} files={data.files} onDone={() => qc.invalidateQueries({ queryKey: ["case", k.id] })} />
+        <AiAssess caseId={k.id} initial={k.aiAssessment} hasImages={data.files.some((f: any) => ["photo", "xray"].includes(f.kind) && /image\/(jpeg|png|webp|gif)/.test(f.mime))} onApply={(fs) => { const n = { ...sit }; for (const f of fs) if (!n[String(f.tooth)]?.s || n[String(f.tooth)]?.s === "intact") n[String(f.tooth)] = { ...(n[String(f.tooth)] ?? {}), s: f.status as Situation[string]["s"] }; setSit(n); persist(n); }} />
       </div></div>
       <div className="row"><button className="btn" onClick={async () => { await put(`/api/cases/${k.id}/situation`, { situation: sit, done: true, skipped: true }); onDone(); }}>{t("skip")}</button><span className="grow" />
         <button className="btn pri" onClick={async () => { await put(`/api/cases/${k.id}/situation`, { situation: sit, done: true, skipped: false }); onDone(); }}>{t("save_continue")} →</button></div>

@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx, qbool } from "../http.ts";
 import { audit } from "../services/audit.ts";
 
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "multiselect", "boolean", "url"] as const;
@@ -35,7 +35,7 @@ const PATIENT_TABLES = ["leads", "cases", "quotes", "deals", "appointments", "co
 export function recordRoutes(app: FastifyInstance) {
   // ── Özel alanlar ──
   app.get("/api/custom-fields", async (req) => {
-    const c = ctx(req); const q = parse(z.object({ entity: z.enum(["lead", "deal"]).optional(), all: z.coerce.boolean().default(false) }), req.query);
+    const c = ctx(req); const q = parse(z.object({ entity: z.enum(["lead", "deal"]).optional(), all: qbool.default(false) }), req.query);
     return withClinic(c.clinicId, (tx) => tx`select * from custom_fields where ${q.entity ? tx`entity = ${q.entity}` : tx`true`} ${q.all ? tx`` : tx`and active`} order by entity, sort, key`);
   });
   const FIELD = z.object({ entity: z.enum(["lead", "deal"]), label: z.string().trim().min(1).max(80), labels: z.record(z.string(), z.string().max(80)).optional(), type: z.enum(FIELD_TYPES),

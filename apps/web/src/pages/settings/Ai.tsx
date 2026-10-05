@@ -1,5 +1,6 @@
 // Ayarlar → Yapay zekâ: anahtar ve limit, ajan modu/kanallar/talimatlar/fiyat politikası/saatler, bilgi tabanı, test sohbeti, kullanım
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../lib/i18n.tsx";
 import { get, post, put, patch, del } from "../../lib/api.ts";
@@ -9,21 +10,22 @@ import { Icon } from "../../components/Icon.tsx";
 export default function AiTab() {
   const { t } = useT(); const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["ai-agent"], queryFn: () => get("/api/ai/agent") });
-  const [d, setD] = useState<any>(null); const [key, setKey] = useState("");
+  const [d, setD] = useState<any>(null);
   if (!data) return <Spinner />;
   const a = d ?? data.agent; const set = (p: any) => setD({ ...a, ...p });
   const r = () => qc.invalidateQueries({ queryKey: ["ai-agent"] });
-  const save = async () => { try { await put("/api/ai/agent", { name: a.name, mode: a.mode, channels: a.channels, persona: a.persona ?? null, instructions: a.instructions ?? null, pricePolicy: a.pricePolicy, hours: a.hours ?? {}, active: true }); setD(null); r(); toast(t("saved")); } catch (e) { toastErr(e); } };
+  const save = async () => { try { await put("/api/ai/agent", { name: a.name, mode: a.mode, channels: a.channels, persona: a.persona ?? null, instructions: a.instructions ?? null, pricePolicy: a.pricePolicy, hours: a.hours ?? {}, features: a.features ?? {}, active: true }); setD(null); r(); toast(t("saved")); } catch (e) { toastErr(e); } };
   const k = data.key;
   return <div className="col" style={{ gap: 14 }}>
-    <div className="card pad col" style={{ gap: 8 }}><b>🔑 {t("ai_key")}</b>
-      <div className="small">{k.available ? <span className="bdg ok">✓ {k.clinic ? t("ai_key_clinic") : k.mock ? t("ai_key_mock") : t("ai_key_platform")}</span> : <span className="bdg err">{t("ai_key_none")}</span>}</div>
-      <div className="row" style={{ gap: 8 }}><input className="inp sm" style={{ maxWidth: 360 }} type="password" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
-        <button className="btn sm" disabled={!key} onClick={async () => { try { await put("/api/ai/key", { key }); setKey(""); r(); toast(t("saved")); } catch (e) { toastErr(e); } }}>{t("save")}</button>
-        {k.clinic && <button className="btn sm ghost danger" onClick={async () => { await put("/api/ai/key", { key: null }); r(); }}>{t("remove")}</button>}</div>
-      <div className="row small" style={{ gap: 8 }}>{t("ai_monthly_cap")} $<input className="inp sm num" style={{ width: 90 }} type="number" min={0} defaultValue={data.cap ?? ""} placeholder="—" onBlur={async (e) => { await put("/api/ai/key", { key: undefined, monthlyCapUsd: e.target.value ? +e.target.value : null }); r(); }} />
-        <span className="muted">{t("this_month")}: {data.usage.calls} {t("ai_calls")} · ${data.usage.costUsd.toFixed(2)}</span></div>
-      <p className="tiny muted" style={{ margin: 0 }}>{t("ai_key_hint")}</p></div>
+    <div className="card pad row wrap" style={{ gap: 10 }}><b>🔑 {t("ai_key")}</b>
+      {k.available ? <span className="bdg ok">✓ {k.clinic ? t("ai_key_clinic") : k.mock ? t("ai_key_mock") : t("ai_key_platform")}</span> : <span className="bdg err">{t("ai_key_none")}</span>}
+      <Link href="/settings/setup" className="btn sm"><Icon n="gear" />{t("setup_tab")}</Link>
+      <span className="grow" /><span className="row small" style={{ gap: 6 }}>{t("ai_monthly_cap")} $<input className="inp sm num" style={{ width: 90 }} type="number" min={0} defaultValue={data.cap ?? ""} placeholder="—" onBlur={async (e) => { await put("/api/ai/key", { key: undefined, monthlyCapUsd: e.target.value ? +e.target.value : null }); r(); }} />
+        <span className="muted">{t("this_month")}: {data.usage.calls} {t("ai_calls")} · ${data.usage.costUsd.toFixed(2)}</span></span></div>
+
+    <div className="card pad col" style={{ gap: 8 }}><b>🧩 {t("ai_features")}</b>
+      <div className="grid g2" style={{ gap: 6 }}>{[["coach", "🎯"], ["translate", "🌐"], ["scoring", "📈"], ["vision", "📷"], ["lossReport", "🧠"], ["qa", "📋"]].map(([fk, ic]) => <label key={fk} className="row small" style={{ gap: 8, alignItems: "flex-start" }}><Switch checked={(a.features ?? {})[fk] !== false && (fk !== "lossReport" || !!(a.features ?? {})[fk])} onChange={(v) => set({ features: { ...(a.features ?? {}), [fk]: v } })} /><span><b>{ic} {t("aif_" + fk)}</b><div className="tiny muted">{t("aif_" + fk + "_hint")}</div></span></label>)}</div>
+      <div className="row"><span className="grow" /><button className="btn sm pri" disabled={!d} onClick={save}>{t("save")}</button></div></div>
 
     <div className="card pad col" style={{ gap: 10 }}><div className="row"><b className="grow">🤖 {t("ai_agent")}</b><button className="btn sm pri" disabled={!d} onClick={save}>{t("save")}</button></div>
       <div className="grid g2" style={{ gap: 10 }}>

@@ -1,3 +1,4 @@
+import { QuoteEngagement } from "../components/SalesWidgets.tsx";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ function QuoteDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     {!q ? <Spinner /> : <div className="grid ws2" style={{ gridTemplateColumns: "minmax(0,1fr) 260px", alignItems: "start", gap: 14 }}>
       <div className="docwrap" id="printable"><QuoteDoc d={snapshotToDoc(q)} cat={catalogFromSnapshot(q.snapshot)} print /></div>
       <div className="col noprint" style={{ gap: 10 }}><div className="row"><QuoteBadge s={q.status} /></div>
+        <QuoteEngagement quoteId={q.id} options={q.snapshot.options.map((o: any) => o.name)} />
         {q.url && <div className="row"><input className="inp sm" readOnly value={q.url} onFocus={(e) => e.target.select()} /><button className="btn sm icon" onClick={() => { navigator.clipboard.writeText(q.url); toast(t("copied")); }}><Icon n="copy" /></button></div>}
         {q.response && <div className="note small"><b>{t("qs_" + (q.status === "accepted" ? "accepted" : q.status))}</b> · {q.snapshot.options[q.response.option]?.name}{q.response.message && <div>“{q.response.message}”</div>}{q.response.reason && <div>{t("dr_" + q.response.reason)}</div>}</div>}
         <h3>{t("events")}</h3><div className="timeline">{q.events.map((e: any, i: number) => <div key={i} className="ev"><div className="small">{t("qe_" + e.type)}{e.staff ? " (staff)" : ""}</div><div className="tiny faint">{date(e.at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div></div>)}</div>

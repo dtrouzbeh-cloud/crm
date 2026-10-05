@@ -11,6 +11,7 @@ import { sequenceHooks, runDueSequences } from "./services/sequences.ts";
 import { recallHooks, activateDueRecalls } from "./services/recalls.ts";
 import { aiHooks } from "./services/ai/agent.ts";
 import { conversionHooks } from "./services/ads.ts";
+import { scoringHooks, rescoreStale } from "./services/scoring.ts";
 import { sendMail } from "./services/mailer.ts";
 import { config as appConfig } from "./config.ts";
 
@@ -49,7 +50,7 @@ async function runWorkflows(ev: Ev) {
 
 async function notifyOwner(ev: Ev) {
   const map: Record<string, string> = { "lead.assigned": "Size yeni bir lead atandı: {name}", "quote.viewed": "{name} teklifi görüntüledi", "quote.accepted": "{name} teklifi KABUL ETTİ 🎉",
-    "quote.changes": "{name} teklifte değişiklik istedi", "payment.succeeded": "{name} ödeme yaptı: {amountText}", "wa.message": "{name}: yeni WhatsApp mesajı", "chat.message": "{name}: yeni mesaj ({channel})", "form.completed": "{name} formu doldurdu: {title}", "deal.amended": "{name}: plan revizyonu onaylandı" };
+    "quote.changes": "{name} teklifte değişiklik istedi", "payment.succeeded": "{name} ödeme yaptı: {amountText}", "wa.message": "{name}: yeni WhatsApp mesajı", "chat.message": "{name}: yeni mesaj ({channel})", "quote.live": "🟢 {name} şu an teklife bakıyor — hemen ara", "form.completed": "{name} formu doldurdu: {title}", "deal.amended": "{name}: plan revizyonu onaylandı" };
   const tpl = map[ev.type]; if (!tpl) return;
   const uid = (ev.payload.ownerId as string) ?? null; if (!uid) return;
   await notifyUser(ev.clinicId, uid, ev.type, render(tpl, ev.payload), (ev.payload.link as string) ?? (ev.payload.leadId ? "/leads/" + ev.payload.leadId : null));
@@ -65,6 +66,7 @@ async function processOutbox(): Promise<number> {
       await recallHooks(ev).catch((e) => console.error("recall", ev.type, e));
       await aiHooks(ev).catch((e) => console.error("ai", ev.type, e));
       await conversionHooks(ev).catch((e) => console.error("capi", ev.type, e));
+      await scoringHooks(ev).catch((e) => console.error("score", ev.type, e));
       await sequenceHooks(ev).catch((e) => console.error("sequence", ev.type, e));
       // giden webhook'lar ve entegrasyonlar için iş oluştur
       await tx`insert into jobs (clinic_id, type, payload) select ${ev.clinicId}, 'webhook.dispatch', ${tx.json({ eventId: ev.id } as never)}
@@ -126,7 +128,8 @@ async function loop() {
   for (;;) {
     let n = 0;
     try { n = (await processOutbox()) + (await processJobs()) + (await runDueSequences()); } catch (e) { console.error("worker", e); }
-    if (Date.now() - lastSla > 60_000) { lastSla = Date.now(); await checkSla().catch((e) => console.error("sla", e)); await activateDueRecalls().catch((e) => console.error("recall", e)); }
+    if (Date.now() - lastSla > 60_000) { lastSla = Date.now(); await checkSla().catch((e) => console.error("sla", e)); await activateDueRecalls().catch((e) => console.error("recall", e)); await rescoreStale(100).catch((e) => console.error("rescore", e)); }
+    if (Date.now() - lastAds > 3600_000) { const { weeklyLossReports } = await import("./services/ai/extras.ts"); await weeklyLossReports().catch((e) => console.error("loss", e)); }
     if (Date.now() - lastAds > 3600_000) { lastAds = Date.now(); await ownerSql`insert into jobs (clinic_id, type, payload, dedupe_key) select clinic_id, 'ads.sync', '{}'::jsonb, 'ads:' || clinic_id || ':' || current_date from integrations where kind = 'meta_ads' and status <> 'disabled' and config ? 'adAccountId' on conflict do nothing`.catch((e) => console.error("ads", e)); }
     if (Date.now() - lastDigest > 10 * 60_000) { lastDigest = Date.now(); await sendDigests().catch((e) => console.error("digest", e)); }
     if (!n) await new Promise<void>((r) => { wake = r; setTimeout(r, 5000); });

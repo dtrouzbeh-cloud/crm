@@ -6,6 +6,7 @@ import { PageHead, Spinner } from "../components/ui.tsx";
 import { minor } from "../lib/format.tsx";
 import { RoasReport } from "../components/AdsPanels.tsx";
 import { SalesPerformance } from "../components/SalesPerf.tsx";
+import { ObjectionsCard, LossReportCard } from "../components/AiReports.tsx";
 
 const pct = (a: number, b: number) => (b ? Math.round((100 * a) / b) : 0);
 export default function Reports() {
@@ -38,6 +39,8 @@ export default function Reports() {
         {data.reps.map((r: any) => <tr key={r.name}><td><b className="small">{r.name}</b></td><td className="r num">{r.leads}</td><td className="r num">{r.won}</td><td className="r num">{r.medianResponseMin != null ? Math.round(r.medianResponseMin) + " dk" : "—"}</td><td className="r num">{r.activities}</td></tr>)}</tbody></table></div></div>}
       {data.lost.length > 0 && <div className="card"><div className="hd"><h3 className="grow">{t("loss_reasons")}</h3></div><div className="bd col">{data.lost.map((r: any) => <div key={r.reason} className="row small"><span className="grow">{t("lr_" + r.reason) !== "lr_" + r.reason ? t("lr_" + r.reason) : r.reason}</span><b>{r.n}</b></div>)}</div></div>}
     </div><SalesPerformance />
+    <ObjectionsCard />
+    <LossReportCard />
     <RoasReport />
   </>;
 }

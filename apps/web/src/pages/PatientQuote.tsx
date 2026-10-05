@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, post } from "../lib/api.ts";
@@ -19,6 +19,15 @@ export default function PatientQuote() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { if (q && !preview) post(`/api/public/q/${token}/view`).catch(() => {}); }, [q?.id]);
   useEffect(() => { const h = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(h); }, []);
+  // canlı takip: sekme görünürken 15 sn'de bir hangi seçenek/bölüme bakıldığı bildirilir (personel önizlemesi sunucuda sayılmaz)
+  const selRef = useRef(0); selRef.current = opt ?? Math.max(0, q?.snapshot?.options?.findIndex((o: any) => o.rec) ?? 0); const dlgRef = useRef<string | null>(null); dlgRef.current = dlg;
+  useEffect(() => { if (!q || preview) return; let last = Date.now();
+    const tick = () => { if (document.hidden) { last = Date.now(); return; } const secs = Math.min(20, Math.max(1, Math.round((Date.now() - last) / 1000))); last = Date.now();
+      let section: string | undefined = dlgRef.current === "accept" ? "accept" : undefined;
+      if (!section) { const mid = innerHeight / 2; let bd = Infinity, bk: string | undefined; document.querySelectorAll<HTMLElement>("[data-sec]").forEach((el) => { const r = el.getBoundingClientRect(); const d = r.top <= mid && r.bottom >= mid ? 0 : Math.min(Math.abs(r.top - mid), Math.abs(r.bottom - mid)); if (d < bd) { bd = d; bk = el.dataset.sec; } }); section = bk; }
+      post(`/api/public/q/${token}/ping`, { option: selRef.current, section, seconds: secs }).catch(() => {}); };
+    const h = setInterval(tick, 15_000); const vis = () => { if (!document.hidden) last = Date.now(); }; document.addEventListener("visibilitychange", vis);
+    return () => { clearInterval(h); document.removeEventListener("visibilitychange", vis); }; }, [q?.id]);
   const s = q?.snapshot; const L = lang ?? s?.lang ?? "en"; const T = (k: string, p?: any) => translate(L, k, p);
   useEffect(() => { if (s) { document.documentElement.lang = L; document.documentElement.dir = L === "ar" ? "rtl" : "ltr"; document.title = `${s.clinic.name} — ${T("pp_title")}`; } }, [s, L]);
   const cat = useMemo(() => (s ? catalogFromSnapshot(s) : null), [s]);
@@ -43,17 +52,17 @@ export default function PatientQuote() {
     </div></div>
     <div className="body">
       {q.status === "accepted" && <div className="pc" style={{ border: "2px solid #10B981" }}><h2 style={{ color: "#0F8A5F" }}>✓ {T("pp_accepted")}</h2><p style={{ margin: "6px 0 0" }}>{T("pp_accepted_d", { opt: s.options[q.acceptedOption ?? 0]?.name })}</p>
-        {q.payment?.length > 0 && <DepositBox token={token} q={q} T={T} M={M} />}</div>}
+        {q.payment?.length > 0 && <div data-sec="payment"><DepositBox token={token} q={q} T={T} M={M} /></div>}</div>}
       {q.status === "changes" && <div className="pc" style={{ border: "2px solid #F59E0B" }}><h2>{T("pp_changes")}</h2><p style={{ margin: "6px 0 0" }}>{T("pp_changes_d")}</p></div>}
       {q.status === "declined" && <div className="pc"><h2>{T("pp_declined")}</h2></div>}
       {(q.superseded || q.status === "superseded") && <div className="pc" style={{ border: "2px solid #F59E0B" }}><h2>{T("pp_superseded")}</h2></div>}
       {(q.status === "expired" || q.status === "revoked") && <div className="pc"><h2>{T("pp_expired")}</h2></div>}
       <div className="pc"><p style={{ margin: 0 }}>{T("intro", { name: s.patient.name.split(" ")[0], clinic: s.clinic.name })}</p>{s.note && <div style={{ borderInlineStart: "3px solid var(--c1)", background: "#F5F8F9", padding: "8px 12px", borderRadius: 8, marginTop: 10 }}>{s.note}</div>}</div>
       {s.options.length > 1 && <div className="ptabs">{s.options.map((o: any, i: number) => <button key={i} className={i === sel ? "on" : ""} onClick={() => setOpt(i)}>{o.rec && <><span style={{ fontSize: 11, fontWeight: 700, color: "var(--c1)" }}>★ {T("recommended")}</span><br /></>}<b>{o.name}</b>{!s.pricesHidden && <div className="p">{M(o.calc.total)}</div>}</button>)}</div>}
-      <div className="pc doc fluid" style={{ boxShadow: "none", padding: 20, width: "auto" }}><OptionBlock d={doc} op={op} cat={cat} lang={L} /></div>
-      <div className="pc"><h2 style={{ fontSize: 16, marginBottom: 10 }}>{T("whats_included")}</h2><div className="doc" style={{ all: "unset", display: "block" }}><div className="incl" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 18px", fontSize: 13 }}>
+      <div className="pc doc fluid" data-sec="plan" style={{ boxShadow: "none", padding: 20, width: "auto" }}><OptionBlock d={doc} op={op} cat={cat} lang={L} /></div>
+      <div className="pc" data-sec="price"><h2 style={{ fontSize: 16, marginBottom: 10 }}>{T("whats_included")}</h2><div className="doc" style={{ all: "unset", display: "block" }}><div className="incl" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 18px", fontSize: 13 }}>
         {["inc_consult", "inc_xray", "inc_coord", "inc_aftercare"].map((k) => <div key={k}>{T(k)}</div>)}{op.calc.pkg.filter((p: any) => p.total <= 0).map((p: any) => <div key={p.k}>{p.nm}</div>)}</div></div></div>
-      <div className="pc"><h2 style={{ fontSize: 16, marginBottom: 10 }}>{T("faq")}</h2>{["faq1", "faq2", "faq3"].map((k) => <details key={k} style={{ borderTop: "1px solid #E3E8EC", padding: "10px 0" }}><summary style={{ cursor: "pointer", fontWeight: 600 }}>{T(k + "q")}</summary><p style={{ margin: "8px 0 0", color: "#55636D" }}>{T(k + "a")}</p></details>)}</div>
+      <div className="pc" data-sec="clinic"><h2 style={{ fontSize: 16, marginBottom: 10 }}>{T("faq")}</h2>{["faq1", "faq2", "faq3"].map((k) => <details key={k} style={{ borderTop: "1px solid #E3E8EC", padding: "10px 0" }}><summary style={{ cursor: "pointer", fontWeight: 600 }}>{T(k + "q")}</summary><p style={{ margin: "8px 0 0", color: "#55636D" }}>{T(k + "a")}</p></details>)}</div>
       <div className="pc row wrap between"><div><b>{s.clinic.name}</b><div className="small" style={{ color: "#55636D" }}>{[s.clinic.phone, s.clinic.email].filter(Boolean).join(" · ")}</div></div><button className="btn" onClick={printDoc}><Icon n="download" />{T("download_pdf")}</button>{(L === "de" || s.patient.country === "DE" || s.patient.country === "AT" || s.patient.country === "CH") && <a className="btn" href={`/q/${token}/hkp?o=${sel}`} target="_blank" rel="noopener">📄 Heil- und Kostenplan</a>}</div>
     </div>
     {!closed && <div className="sticky"><button className="btn" onClick={() => setDlg("decline")}>{T("decline")}</button><button className="btn" onClick={() => setDlg("changes")}>{T("req_changes")}</button>

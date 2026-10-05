@@ -8,9 +8,9 @@ import { toast } from "../components/ui.tsx";
 const MAP: [RegExp, string[][]][] = [
   [/^lead\./, [["leads"], ["leadstats"], ["lead"], ["dashboard"]]],
   [/^case\./, [["cases"], ["dashboard"]]],
-  [/^quote\./, [["quotes"], ["quote"], ["cases"], ["lead"], ["dashboard"]]],
+  [/^quote\./, [["quotes"], ["quote"], ["cases"], ["lead"], ["dashboard"], ["quotes-live"], ["engagement"], ["call-list"]]],
   [/^(deal|payment)\./, [["deals"], ["deal"], ["fin-summary"], ["commissions"], ["my-commissions"]]],
-  [/^wa\.|^message\.|^chat\.|^ai\./, [["convs"], ["conv"], ["inboxunread"], ["conv-ai"]]],
+  [/^wa\.|^message\.|^chat\.|^ai\./, [["convs"], ["conv"], ["inboxunread"], ["conv-ai"], ["conv-coach"], ["call-list"]]],
   [/^task\./, [["tasks"], ["taskcounts"]]],
   [/^form\./, [["forms"], ["lead"]]],
   [/^visit\./, [["deals"], ["interp"]]],

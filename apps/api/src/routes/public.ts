@@ -46,6 +46,30 @@ export function publicRoutes(app: FastifyInstance) {
     return { ok: true, staff };
   });
 
+  // canlı teklif takibi: hasta sayfası 15 sn'de bir bildirir (personel önizlemesi sayılmaz)
+  app.post("/api/public/q/:token/ping", { config: { rateLimit: { max: 12, timeWindow: "1 minute" } } }, async (req) => {
+    if (req.sessionUserId) return { ok: true, staff: true };
+    const { token } = req.params as { token: string };
+    const b = parse(z.object({ option: z.number().int().min(0).max(2).optional(), section: z.enum(["plan", "chart", "price", "payment", "clinic", "accept"]).optional(), seconds: z.number().int().min(1).max(20).default(15) }), req.body ?? {});
+    const [q] = await ownerSql`select id, clinic_id, lead_id, status from quotes where token_hash = ${sha256(token)}`; if (!q) throw notFound("Teklif");
+    const o = b.option != null ? String(b.option) : null, sct = b.section ?? null;
+    const [prev] = await ownerSql`select last_ping from quote_live where quote_id = ${q.id}`;
+    const fresh = !!prev && Date.now() - new Date(prev.lastPing as Date).getTime() > 3 * 60_000;
+    await ownerSql`insert into quote_live (quote_id, clinic_id, lead_id, seconds_total, option_seconds, section_seconds, current_option, current_section)
+      values (${q.id}, ${q.clinicId}, ${q.leadId}, ${b.seconds}, ${o ? ownerSql.json({ [o]: b.seconds } as never) : ownerSql.json({} as never)}, ${sct ? ownerSql.json({ [sct]: b.seconds } as never) : ownerSql.json({} as never)}, ${b.option ?? null}, ${sct})
+      on conflict (quote_id) do update set last_ping = now(), seconds_total = quote_live.seconds_total + ${b.seconds}, current_option = ${b.option ?? null}, current_section = ${sct},
+        sessions = quote_live.sessions + ${fresh ? 1 : 0}, session_started = case when ${fresh} then now() else quote_live.session_started end,
+        option_seconds = case when ${o}::text is null then quote_live.option_seconds else jsonb_set(quote_live.option_seconds, array[${o}::text], to_jsonb(coalesce((quote_live.option_seconds->>${o}::text)::int, 0) + ${b.seconds})) end,
+        section_seconds = case when ${sct}::text is null then quote_live.section_seconds else jsonb_set(quote_live.section_seconds, array[${sct}::text], to_jsonb(coalesce((quote_live.section_seconds->>${sct}::text)::int, 0) + ${b.seconds})) end`;
+    // yeniden ziyaret (ilk açılışı quote.viewed zaten bildirir) → "şu an bakıyor" olayı
+    if (fresh && ["sent", "viewed", "changes"].includes(q.status as string)) {
+      const [l] = await ownerSql`select l.owner_id, p.full_name from leads l join patients p on p.id = l.patient_id where l.id = ${q.leadId}`;
+      await ownerSql`insert into outbox_events (clinic_id, type, entity_id, payload) values (${q.clinicId}, 'quote.live', ${q.id}, ${ownerSql.json({ quoteId: q.id, leadId: q.leadId, name: l?.fullName, ownerId: l?.ownerId, link: "/leads/" + q.leadId } as never)})`;
+      await ownerSql`select pg_notify('outbox', 'live')`;
+    } else if (!prev) await ownerSql`select pg_notify('rt', ${JSON.stringify({ k: "e", c: q.clinicId, t: "quote.ping", e: q.id })})`;
+    return { ok: true };
+  });
+
   app.post("/api/public/q/:token/respond", async (req) => {
     const { token } = req.params as { token: string };
     const b = parse(z.object({ action: z.enum(["accept", "changes", "decline"]), option: z.number().int().min(0).max(2).default(0), message: z.string().max(3000).optional(), reason: z.string().max(60).optional(), agree: z.boolean().optional() }), req.body);

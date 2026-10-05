@@ -6,10 +6,12 @@ import { dispatchWebhook } from "./services/webhooks.ts";
 import { deliver } from "./services/mailer.ts";
 export type JobHandler = (payload: Record<string, unknown>, clinicId: string | null) => Promise<void>;
 export const handlers: Record<string, JobHandler> = {
-  "mail.send": async (p) => { await deliver(p as never); },
+  "mail.send": async (p, clinicId) => { await deliver(p as never, clinicId); },
   "campaign.send": async (p) => { const { sendCampaignBatch } = await import("./services/campaigns.ts"); await sendCampaignBatch(String(p.id)); },
   "capi.send": async (p) => { const { sendConversion } = await import("./services/ads.ts"); await sendConversion(Number(p.id)); },
   "ads.sync": async (_p, clinicId) => { const { syncMetaSpend } = await import("./services/ads.ts"); await syncMetaSpend(clinicId!, 3); },
+  "stt.transcribe": async (p) => { const { transcribeMessage } = await import("./services/stt.ts"); await transcribeMessage(Number(p.messageId)); },
+  "ai.coach": async (p, clinicId) => { const { coachConversation } = await import("./services/ai/coach.ts"); await coachConversation(clinicId!, String(p.conversationId)); },
   "ai.reply": async (p, clinicId) => { const { aiReplyJob } = await import("./services/ai/agent.ts"); await aiReplyJob(clinicId!, String(p.conversationId)); },
   // takip dizisi WhatsApp adımı (dış API çağrısı işlemden ayrı, yeniden denenebilir)
   "sequence.wa": async (p, clinicId) => {

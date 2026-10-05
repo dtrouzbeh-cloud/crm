@@ -5,7 +5,7 @@ import { config } from "../config.ts";
 
 export type NotifyPrefs = { inApp?: Record<string, boolean>; email?: Record<string, boolean>; browser?: boolean; sound?: boolean; digest?: boolean; lastDigest?: string };
 // varsayılan: hepsi uygulama içi açık; e-posta yalnız kritik olaylar için açık
-export const EMAIL_DEFAULT: Record<string, boolean> = { "quote.accepted": true, "payment.succeeded": false, "lead.assigned": false, "task.assigned": false, "quote.viewed": false, "quote.changes": true, "wa.message": false, "form.completed": false, "deal.amended": true, "pipeline.sla": false, "complaint.created": true, "ai.handoff": true };
+export const EMAIL_DEFAULT: Record<string, boolean> = { "quote.accepted": true, "payment.succeeded": false, "lead.assigned": false, "task.assigned": false, "quote.viewed": false, "quote.changes": true, "wa.message": false, "form.completed": false, "deal.amended": true, "pipeline.sla": false, "complaint.created": true, "ai.handoff": true, "quote.live": false, "ai.report": false };
 export const NOTIFY_TYPES = Object.keys(EMAIL_DEFAULT);
 
 export async function notifyUser(clinicId: string, userId: string, type: string, title: string, link: string | null, body?: string | null) {

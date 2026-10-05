@@ -9,6 +9,7 @@ import { useMe, useCan } from "../lib/auth.ts";
 import { LEAD_STAGES, salesStageOrder, StageBadge, stageLabel, TEMP, flag, FLAGS, QuoteBadge, CaseBadge, minor } from "../lib/format.tsx";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import { eventText } from "./Dashboard.tsx";
+import { ScoreBadge } from "../components/SalesWidgets.tsx";
 import { TaskRow, NewTaskDrawer } from "./Tasks.tsx";
 import { FormsCard } from "../components/FormsCard.tsx";
 import { CustomFieldsCard } from "./settings/Fields.tsx";
@@ -48,7 +49,7 @@ export default function LeadDetail() {
       <div className="grow"><div className="row wrap"><h1>{l.fullName}</h1><span>{TEMP[l.temperature]}</span><span className="tiny faint">#{l.number}</span></div>
         <div className="row wrap small muted" style={{ marginTop: 4, gap: 10 }}><span>{flag(l.country)} {l.country}</span><span>{LANG_NAMES[l.language] ?? l.language ?? ""}</span><span>{t("src_" + l.source)}</span><span>{t("created")} {rel(l.createdAt)}</span>
           {med?.flags?.length ? <span className="bdg err"><Icon n="alert" size={12} /> {med.flags.map((f: string) => t("med_" + f)).join(", ")}</span> : null}</div></div>
-      <select className="inp" style={{ width: "auto" }} value={l.stage} disabled={!can("lead.write")} onChange={(e) => e.target.value === "lost" ? setLost(true) : save({ stage: e.target.value })}>{(salesStageOrder().includes(l.stage) ? salesStageOrder() : [...salesStageOrder(), l.stage]).map((s) => <option key={s} value={s}>{stageLabel(t, s)}</option>)}</select>
+      <ScoreBadge score={l.score} reasons={l.scoreReasons} /><select className="inp" style={{ width: "auto" }} value={l.stage} disabled={!can("lead.write")} onChange={(e) => e.target.value === "lost" ? setLost(true) : save({ stage: e.target.value })}>{(salesStageOrder().includes(l.stage) ? salesStageOrder() : [...salesStageOrder(), l.stage]).map((s) => <option key={s} value={s}>{stageLabel(t, s)}</option>)}</select>
       {phoneOk && <><a className="btn" href={`tel:${l.phone}`}><Icon n="phone" />{t("call")}</a><button className="btn" style={{ color: "#16A34A" }} onClick={async () => { try { const r = await post("/api/inbox/start", { leadId: id }); nav(`/inbox/${r.id}`); } catch { window.open(`https://wa.me/${l.phone.replace(/\D/g, "")}`, "_blank"); } }}><Icon n="wa" />WhatsApp</button></>}
       {openCaseObj ? <Link className="btn pri" href={`/cases/${openCaseObj.id}`}><Icon n="tooth" />{t("go_case")}</Link> : can("case.write") && <button className="btn pri" onClick={openCase}><Icon n="tooth" />{t("open_case")}</button>}
     </div></div>

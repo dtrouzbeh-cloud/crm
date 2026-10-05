@@ -2,13 +2,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
-import { ctx, need, parse, notFound } from "../http.ts";
+import { ctx, need, parse, notFound, qbool } from "../http.ts";
 import { audit } from "../services/audit.ts";
 
 export function interpreterRoutes(app: FastifyInstance) {
   app.get("/api/interpreter/agenda", async (req) => {
     const c = need(ctx(req), "appointment.read");
-    const q = parse(z.object({ days: z.coerce.number().int().min(1).max(14).default(2), mine: z.coerce.boolean().default(false) }), req.query);
+    const q = parse(z.object({ days: z.coerce.number().int().min(1).max(14).default(2), mine: qbool.default(false) }), req.query);
     const showMed = c.perms["field.medical"] !== "hide";
     return withClinic(c.clinicId, async (tx) => {
       const rows = await tx`

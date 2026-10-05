@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../lib/i18n.tsx";
@@ -15,8 +15,9 @@ import BillingTab from "./settings/Billing.tsx";
 import FormsTab from "./settings/Forms.tsx";
 import FieldsTab from "./settings/Fields.tsx";
 import AiTab from "./settings/Ai.tsx";
+import SetupTab from "./settings/Setup.tsx";
 
-const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["forms", "forms", "pen"], ["fields", "custom_fields", "list"], ["ai", "ai_tab", "spark"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
+const TABS = [["general", "general", "gear"], ["setup", "setup_tab", "ok"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["forms", "forms", "pen"], ["fields", "custom_fields", "list"], ["ai", "ai_tab", "spark"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
 
 export default function Settings() {
   const { tab = "general" } = useParams<{ tab?: string }>(); const [, nav] = useLocation(); const { t } = useT();
@@ -24,7 +25,7 @@ export default function Settings() {
     <PageHead title={t("nav_settings")} sub={t("settings_sub")} />
     <div className="tabs" style={{ marginBottom: 14 }}>{TABS.map(([k, l, ic]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => nav(`/settings/${k}`)}><Icon n={ic} size={15} />{t(l)}</button>)}</div>
     {tab === "general" && <General />}{tab === "team" && <Team />}{tab === "roles" && <Roles />}{tab === "workflows" && <Workflows />}{tab === "content" && <Content />}{tab === "audit" && <Audit />}
-    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}{tab === "forms" && <FormsTab />}{tab === "fields" && <FieldsTab />}{tab === "ai" && <AiTab />}
+    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}{tab === "forms" && <FormsTab />}{tab === "fields" && <FieldsTab />}{tab === "ai" && <AiTab />}{tab === "setup" && <SetupTab />}
   </>;
 }
 function LazyTab({ name }: { name: string }) {
@@ -152,7 +153,19 @@ function Content() {
   if (!data) return <Spinner />;
   const save = async (id: string, b: any) => { await put(`/api/content/${id}`, b); qc.invalidateQueries({ queryKey: ["content"] }); toast(t("saved")); };
   const KINDS = ["faq", "team", "testimonial", "certificate", "legal"];
-  return <div className="col" style={{ gap: 12 }}>{KINDS.map((k) => <div key={k} className="card"><div className="hd"><h3 className="grow">{t("ck_" + k)}</h3><button className="btn sm" onClick={() => save("new", { kind: k, data: k === "faq" ? { q: { tr: "", en: "" }, a: { tr: "", en: "" } } : { title: "", text: "" } })}><Icon n="plus" /></button></div><div className="bd col">
+  const files = useRef<HTMLInputElement>(null); const [galBusy, setGalBusy] = useState(false);
+  const gallery = data.filter((x: any) => x.kind === "gallery");
+  const uploadGallery = async (list: FileList | null) => { if (!list?.length) return; setGalBusy(true); try { for (const fl of [...list]) { const row: any = await put("/api/content/new", { kind: "gallery", data: { caption: "", tags: "" } });
+    const fd = new FormData(); fd.append("file", fl); const r = await fetch(`/api/files?kind=media&entity=content&entityId=${row.id}`, { method: "POST", body: fd, credentials: "include" }); const up = await r.json(); if (!r.ok) throw new Error(up.message);
+    await put(`/api/content/${row.id}`, { fileId: up[0].id }); } qc.invalidateQueries({ queryKey: ["content"] }); } catch (e) { toastErr(e); } finally { setGalBusy(false); if (files.current) files.current.value = ""; } };
+  return <div className="col" style={{ gap: 12 }}>
+    <div className="card"><div className="hd"><h3 className="grow">📸 {t("ck_gallery")}</h3><input ref={files} type="file" accept="image/*" multiple hidden onChange={(e) => uploadGallery(e.target.files)} /><button className="btn sm" disabled={galBusy} onClick={() => files.current?.click()}><Icon n="upload" />{galBusy ? "…" : t("upload")}</button></div>
+      <div className="bd"><div className="tiny muted" style={{ marginBottom: 8 }}>{t("gallery_hint")}</div>{!gallery.length ? <div className="empty small">{t("no_records")}</div> : <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 10 }}>
+        {gallery.map((x: any) => <div key={x.id} className="card pad col" style={{ padding: 6, gap: 4 }}>{x.fileId && <img src={`/api/files/${x.fileId}`} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 6 }} />}
+          <input className="inp sm" placeholder={t("caption")} defaultValue={x.data.caption ?? ""} onBlur={(e) => save(x.id, { data: { ...x.data, caption: e.target.value } })} />
+          <input className="inp sm" placeholder={t("tags_ph")} defaultValue={x.data.tags ?? ""} onBlur={(e) => save(x.id, { data: { ...x.data, tags: e.target.value } })} />
+          <div className="row"><Switch checked={x.active} onChange={(v) => save(x.id, { active: v })} /><span className="grow" /><button className="btn xs ghost icon danger" onClick={async () => { await del(`/api/content/${x.id}`); qc.invalidateQueries({ queryKey: ["content"] }); }}><Icon n="trash" /></button></div></div>)}</div>}</div></div>
+    {KINDS.map((k) => <div key={k} className="card"><div className="hd"><h3 className="grow">{t("ck_" + k)}</h3><button className="btn sm" onClick={() => save("new", { kind: k, data: k === "faq" ? { q: { tr: "", en: "" }, a: { tr: "", en: "" } } : { title: "", text: "" } })}><Icon n="plus" /></button></div><div className="bd col">
     {data.filter((x: any) => x.kind === k).map((x: any) => <div key={x.id} className="row wrap" style={{ alignItems: "flex-start" }}>
       {k === "faq" ? <div className="grid g2 grow">{["tr", "en"].map((l) => <div key={l} className="col" style={{ gap: 4 }}><input className="inp sm" placeholder={`Q (${l})`} defaultValue={x.data.q?.[l] ?? ""} onBlur={(e) => save(x.id, { data: { ...x.data, q: { ...x.data.q, [l]: e.target.value } } })} />
         <textarea className="inp" style={{ minHeight: 50 }} placeholder={`A (${l})`} defaultValue={x.data.a?.[l] ?? ""} onBlur={(e) => save(x.id, { data: { ...x.data, a: { ...x.data.a, [l]: e.target.value } } })} /></div>)}</div>

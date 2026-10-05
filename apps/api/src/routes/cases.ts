@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx, qbool } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { loadCatalog } from "../services/catalog.ts";
 import { checkRules, suggestPlan, makeOption, type PlanItem, type Situation } from "@dentaflow/core/engine";
@@ -37,7 +37,7 @@ const jawLabel = (lang: string) => (j: "u" | "l") => translate(lang, j === "u" ?
 export function caseRoutes(app: FastifyInstance) {
   app.get("/api/cases", async (req) => {
     const c = need(ctx(req), "case.read");
-    const q = parse(z.object({ status: z.string().optional(), mine: z.coerce.boolean().optional(), limit: z.coerce.number().max(200).default(60) }), req.query);
+    const q = parse(z.object({ status: z.string().optional(), mine: qbool.optional(), limit: z.coerce.number().max(200).default(60) }), req.query);
     return withClinic(c.clinicId, async (tx) => {
       const rows = await tx`
         select k.id, k.number, k.status, k.dentist_id, k.owner_id, k.visits, k.situation, k.plan_items, k.created_at, k.updated_at, k.lead_id,

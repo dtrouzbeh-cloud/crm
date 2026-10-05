@@ -3,7 +3,7 @@ import { salesStageKeys } from "../services/pipelines.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, notFound, HttpError, type Ctx, qbool } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { maskValue } from "@dentaflow/core/permissions";
 import { normalizePhone } from "@dentaflow/core/phone";
@@ -97,10 +97,10 @@ export function leadRoutes(app: FastifyInstance) {
     const q = parse(z.object({
       stage: z.string().optional(), owner: z.string().optional(), source: z.string().optional(), temperature: z.string().optional(),
       q: z.string().max(100).optional(), view: z.enum(["active", "mine", "all", "archived"]).default("active"),
-      sort: z.enum(["activity", "created", "followup"]).default("activity"),
+      sort: z.enum(["activity", "created", "followup", "score"]).default("activity"),
       limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0),
       country: z.string().max(2).optional(), language: z.string().max(5).optional(), tag: z.string().max(40).optional(), partner: z.string().optional(), campaign: z.string().max(200).optional(),
-      createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(), overdue: z.coerce.boolean().optional(), noOwner: z.coerce.boolean().optional(),
+      createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(), overdue: qbool.optional(), noOwner: qbool.optional(),
       cf: z.string().max(2000).optional(),   // özel alan filtresi: JSON {anahtar: değer}
     }), req.query);
     let cf: Record<string, unknown> | null = null;
@@ -122,9 +122,9 @@ export function leadRoutes(app: FastifyInstance) {
         ${q.noOwner ? tx`and l.owner_id is null` : tx``}
         ${cf && Object.keys(cf).length ? tx`and l.custom @> ${tx.json(cf as never)}` : tx``}
         ${q.q ? tx`and (p.full_name ilike ${"%" + q.q + "%"} or p.phone like ${"%" + q.q.replace(/\D/g, "") + "%"} or p.email ilike ${"%" + q.q + "%"} or l.number::text = ${q.q})` : tx``}`;
-      const order = q.sort === "created" ? tx`l.created_at desc` : q.sort === "followup" ? tx`l.next_follow_up_at asc nulls last` : tx`l.last_activity_at desc`;
+      const order = q.sort === "score" ? tx`l.score desc nulls last, l.last_activity_at desc` : q.sort === "created" ? tx`l.created_at desc` : q.sort === "followup" ? tx`l.next_follow_up_at asc nulls last` : tx`l.last_activity_at desc`;
       const rows = await tx`
-        select l.id, l.number, l.stage, l.temperature, l.source, l.campaign, l.owner_id, l.interest, l.last_activity_at, l.next_follow_up_at, l.created_at, l.tags, l.custom,
+        select l.id, l.number, l.stage, l.temperature, l.source, l.campaign, l.owner_id, l.interest, l.last_activity_at, l.next_follow_up_at, l.created_at, l.tags, l.custom, l.score,
                p.id as patient_id, p.full_name, p.phone, p.email, p.country, p.language, u.name as owner_name,
                (select count(*) from tasks t where t.lead_id = l.id and t.done_at is null and t.due_at < now())::int as overdue_tasks
         from leads l join patients p on p.id = l.patient_id left join users u on u.id = l.owner_id

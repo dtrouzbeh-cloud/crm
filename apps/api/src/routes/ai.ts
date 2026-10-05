@@ -8,10 +8,11 @@ import { encrypt } from "../lib/crypto.ts";
 import { runAgent } from "../services/ai/agent.ts";
 import { complete, MODELS, aiAvailable, isMock, apiKeyFor } from "../services/ai/llm.ts";
 import { sendInConversation } from "./inbox.ts";
+import { getSecret } from "../services/secrets.ts";
 
 const AGENT = z.object({ name: z.string().trim().min(1).max(60), mode: z.enum(["off", "assist", "auto_offhours", "auto_always"]), channels: z.array(z.enum(["whatsapp", "instagram", "messenger", "web", "email"])).max(6),
   persona: z.string().max(1000).nullable(), instructions: z.string().max(6000).nullable(), pricePolicy: z.enum(["none", "ranges", "packages"]),
-  handoff: z.record(z.string(), z.unknown()), hours: z.object({ start: z.number().int().min(0).max(23).optional(), end: z.number().int().min(1).max(24).optional(), days: z.array(z.number().int().min(0).max(6)).optional() }), active: z.boolean() }).partial();
+  handoff: z.record(z.string(), z.unknown()), features: z.record(z.string(), z.boolean()), hours: z.object({ start: z.number().int().min(0).max(23).optional(), end: z.number().int().min(1).max(24).optional(), days: z.array(z.number().int().min(0).max(6)).optional() }), active: z.boolean() }).partial();
 
 export function aiRoutes(app: FastifyInstance) {
   app.get("/api/ai/agent", async (req) => {
@@ -20,8 +21,9 @@ export function aiRoutes(app: FastifyInstance) {
       const [a] = await tx`select * from ai_agents where kind = 'text'`;
       const [cl] = await tx`select settings->'ai' as ai from clinics where id = ${c.clinicId}`;
       const [u] = await tx`select coalesce(sum(calls),0)::int as calls, coalesce(sum(cost_micro),0)::bigint as cost from ai_usage where day >= date_trunc('month', current_date)`;
-      return { agent: a ?? { name: "Asistan", mode: "off", channels: ["whatsapp"], pricePolicy: "ranges", handoff: {}, hours: { start: 9, end: 19, days: [1, 2, 3, 4, 5, 6] }, active: true },
-        key: { clinic: !!(cl?.ai as any)?.keyEnc, platform: !!process.env.ANTHROPIC_API_KEY, mock: isMock(), available: await aiAvailable(c.clinicId) },
+      const sec = await getSecret(c.clinicId, "anthropic");
+      return { agent: a ?? { name: "Asistan", mode: "off", channels: ["whatsapp"], pricePolicy: "ranges", handoff: {}, features: { coach: true, translate: true, scoring: true }, hours: { start: 9, end: 19, days: [1, 2, 3, 4, 5, 6] }, active: true },
+        key: { clinic: !!sec || !!(cl?.ai as any)?.keyEnc, platform: !!process.env.ANTHROPIC_API_KEY, mock: isMock(), available: await aiAvailable(c.clinicId) },
         cap: (cl?.ai as any)?.monthlyCapUsd ?? null, usage: { calls: u!.calls, costUsd: Number(u!.cost) / 1e6 }, models: MODELS };
     });
   });
@@ -30,10 +32,10 @@ export function aiRoutes(app: FastifyInstance) {
     return withClinic(c.clinicId, async (tx) => {
       const [cur] = await tx`select * from ai_agents where kind = 'text'`;
       const v = { name: b.name ?? cur?.name ?? "Asistan", mode: b.mode ?? cur?.mode ?? "off", channels: b.channels ?? cur?.channels ?? ["whatsapp"], persona: b.persona !== undefined ? b.persona : cur?.persona ?? null,
-        instructions: b.instructions !== undefined ? b.instructions : cur?.instructions ?? null, pricePolicy: b.pricePolicy ?? cur?.pricePolicy ?? "ranges", handoff: b.handoff ?? cur?.handoff ?? {}, hours: b.hours ?? cur?.hours ?? {}, active: b.active ?? cur?.active ?? true };
-      if (v.mode !== "off" && !(await aiAvailable(c.clinicId))) throw new HttpError(400, "ai_key_missing", "Önce bir Claude API anahtarı tanımlayın");
-      await tx`insert into ai_agents (clinic_id, kind, name, mode, channels, persona, instructions, price_policy, handoff, hours, active) values (${c.clinicId}, 'text', ${v.name}, ${v.mode}, ${v.channels}, ${v.persona}, ${v.instructions}, ${v.pricePolicy}, ${tx.json(v.handoff as never)}, ${tx.json(v.hours as never)}, ${v.active})
-        on conflict (clinic_id, kind) do update set name = excluded.name, mode = excluded.mode, channels = excluded.channels, persona = excluded.persona, instructions = excluded.instructions, price_policy = excluded.price_policy, handoff = excluded.handoff, hours = excluded.hours, active = excluded.active`;
+        instructions: b.instructions !== undefined ? b.instructions : cur?.instructions ?? null, pricePolicy: b.pricePolicy ?? cur?.pricePolicy ?? "ranges", handoff: b.handoff ?? cur?.handoff ?? {}, features: { ...((cur?.features as object) ?? { coach: true, translate: true, scoring: true }), ...(b.features ?? {}) }, hours: b.hours ?? cur?.hours ?? {}, active: b.active ?? cur?.active ?? true };
+      if ((v.mode !== "off" && v.mode !== cur?.mode) && !(await aiAvailable(c.clinicId))) throw new HttpError(400, "ai_key_missing", "Önce bir Claude API anahtarı tanımlayın");
+      await tx`insert into ai_agents (clinic_id, kind, name, mode, channels, persona, instructions, price_policy, handoff, features, hours, active) values (${c.clinicId}, 'text', ${v.name}, ${v.mode}, ${v.channels}, ${v.persona}, ${v.instructions}, ${v.pricePolicy}, ${tx.json(v.handoff as never)}, ${tx.json(v.features as never)}, ${tx.json(v.hours as never)}, ${v.active})
+        on conflict (clinic_id, kind) do update set name = excluded.name, mode = excluded.mode, channels = excluded.channels, persona = excluded.persona, instructions = excluded.instructions, price_policy = excluded.price_policy, handoff = excluded.handoff, features = excluded.features, hours = excluded.hours, active = excluded.active`;
       await audit(tx, c, "ai.agent.update", "ai_agent", null, { mode: v.mode, channels: v.channels }); return { ok: true };
     });
   });

@@ -5,6 +5,7 @@ import { useT } from "../lib/i18n.tsx";
 import { get, put, qs } from "../lib/api.ts";
 import { Spinner, toast, toastErr } from "./ui.tsx";
 import { useCan } from "../lib/auth.ts";
+import { QaButton } from "./AiReports.tsx";
 
 export function SalesPerformance() {
   const { t, money } = useT(); const can = useCan(); const qc = useQueryClient();
@@ -24,7 +25,7 @@ export function SalesPerformance() {
             <td className="r num" style={{ color: r.medianResponseMin != null && r.medianResponseMin > 15 ? "var(--warn)" : undefined }}>{r.medianResponseMin != null ? r.medianResponseMin + " dk" : "—"}</td><td className="r num">{r.quotes}</td><td className="r num"><b>{r.deals}</b></td><td className="r num">{M(r.collected)}</td>
             <td className="r num">{r.lost}</td><td className="r num" style={{ color: r.slaBreaches ? "var(--err)" : undefined }}>{r.slaBreaches}</td><td className="r num" style={{ color: r.overdueTasks ? "var(--warn)" : undefined }}>{r.overdueTasks}</td>
             <td style={{ minWidth: 160 }}>{prog != null && <div><div className="prog" style={{ height: 6 }}><i style={{ width: prog + "%" }} /></div><div className="tiny muted">{prog}% · {M(tr.revenue, tr.currency)} / {tr.deals} deal</div></div>}
-              {can("team.manage") && <button className="btn xs ghost" onClick={() => { const rv = prompt(t("target_revenue"), tr ? String(Number(tr.revenue) / 100) : ""); if (rv == null) return; const dl = prompt(t("target_deals"), tr ? String(tr.deals) : "0"); setTarget(r.userId, Number(rv) || 0, Number(dl) || 0); }}>🎯</button>}</td></tr>; })}
+              {can("team.manage") && <QaButton userId={r.userId} name={r.name} />}{can("team.manage") && <button className="btn xs ghost" onClick={() => { const rv = prompt(t("target_revenue"), tr ? String(Number(tr.revenue) / 100) : ""); if (rv == null) return; const dl = prompt(t("target_deals"), tr ? String(tr.deals) : "0"); setTarget(r.userId, Number(rv) || 0, Number(dl) || 0); }}>🎯</button>}</td></tr>; })}
       </tbody></table></div></div>
     {(ai.ai || ai.human) && <div className="card" style={{ marginTop: 14 }}><div className="hd"><h3 className="grow">🤖 {t("ai_vs_human")}</h3></div><div className="twrap"><table className="tbl"><thead><tr><th>{t("first_contact")}</th><th className="r">Lead</th><th className="r">{t("first_response")}</th><th className="r">{t("f_quoted")}</th><th className="r">Deal</th></tr></thead><tbody>
       {["ai", "human"].filter((k) => ai[k]).map((k) => <tr key={k}><td>{k === "ai" ? "🤖 AI" : "👤 " + t("human")}</td><td className="r num">{ai[k].leads}</td><td className="r num">{ai[k].medianResponseMin != null ? ai[k].medianResponseMin + " dk" : "—"}</td><td className="r num">{ai[k].quoted} <span className="tiny faint">{pct(ai[k].quoted, ai[k].leads)}</span></td><td className="r num">{ai[k].won} <span className="tiny faint">{pct(ai[k].won, ai[k].leads)}</span></td></tr>)}</tbody></table></div></div>}

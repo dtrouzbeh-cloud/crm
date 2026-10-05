@@ -39,5 +39,7 @@ export function parsePatch<T extends z.ZodType>(schema: T, data: unknown): z.inf
   if (data && typeof data === "object" && !Array.isArray(data)) { const sent = new Set(Object.keys(data)); for (const k of Object.keys(out)) if (!sent.has(k)) delete out[k]; }
   return out as z.infer<T>;
 }
+/** Sorgu dizesi için boolean: "true"/"1" → true, "false"/"0"/"" → false (z.coerce.boolean "false" metnini true sayar) */
+export const qbool = z.preprocess((v) => (typeof v === "string" ? ["true", "1", "yes", "on"].includes(v.toLowerCase()) : v), z.boolean());
 export type Req = FastifyRequest; export type Rep = FastifyReply;
 export const ipOf = (req: FastifyRequest) => (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.ip;

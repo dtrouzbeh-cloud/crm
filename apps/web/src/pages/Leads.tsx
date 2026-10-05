@@ -7,6 +7,7 @@ import { PageHead, Empty, Drawer, toast, toastErr, Avatar, Spinner } from "../co
 import { Icon } from "../components/Icon.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
 import { LEAD_STAGES, STAGE_COL, StageBadge, stageLabel, TEMP, flag, FLAGS, salesStageOrder } from "../lib/format.tsx";
+import { ScoreBadge } from "../components/SalesWidgets.tsx";
 import { FilterBar, SavedViews, filterCount, filterParams, useCustomFields, cfLabel, type LeadFilter } from "../components/LeadFilters.tsx";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import ImportModal from "./ImportModal.tsx";
@@ -26,7 +27,8 @@ export default function Leads() {
   const { lang } = useT();
   const isStage = salesStageOrder().includes(tab) || LEAD_STAGES.includes(tab);
   const fp = filterParams(filters);
-  const params = view === "kanban" ? { view: "all", q: dq, limit: 200, ...fp } : { view: isStage ? "all" : tab, stage: isStage ? tab : undefined, q: dq, limit: 50, offset: page * 50, ...fp };
+  const sortBy = sp.get("sort") ?? undefined;
+  const params = view === "kanban" ? { view: "all", q: dq, limit: 200, ...fp } : { view: isStage ? "all" : tab, stage: isStage ? tab : undefined, q: dq, limit: 50, offset: page * 50, sort: sortBy, ...fp };
   const { data, isLoading } = useQuery({ queryKey: ["leads", params], queryFn: () => get("/api/leads" + qs(params)), placeholderData: keepPreviousData });
   const { data: stats } = useQuery({ queryKey: ["leadstats"], queryFn: () => get<Record<string, number>>("/api/leads/stats") });
   const qc = useQueryClient();
@@ -54,7 +56,7 @@ export default function Leads() {
         {isLoading ? <Spinner /> : data?.items?.length ? <div className="twrap"><table className="tbl"><thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("country")}</th><th>{t("status")}</th><th>{t("source")}</th><th>{t("temp")}</th>{listCfs.map((f) => <th key={f.id}>{cfLabel(f, lang)}</th>)}<th>{t("owner")}</th><th>{t("last_act")}</th><th /></tr></thead><tbody>
           {data.items.map((l: any) => <tr key={l.id} className="click" onClick={() => nav(`/leads/${l.id}`)}>
             <td><div className="row"><Avatar name={l.fullName} /><div><div style={{ fontWeight: 600 }}>{l.fullName} {l.overdueTasks > 0 && <span className="bdg err" title={t("g_overdue")}>{l.overdueTasks}</span>}</div><div className="tiny muted">#{l.number} · {l.email ?? ""}</div></div></div></td>
-            <td className="num small">{l.phone}</td><td>{flag(l.country)} <span className="small muted">{l.country}</span></td><td><StageBadge s={l.stage} /></td>
+            <td className="num small">{l.phone}</td><td>{flag(l.country)} <span className="small muted">{l.country}</span></td><td><span className="row" style={{ gap: 6 }}><StageBadge s={l.stage} /><ScoreBadge score={l.score} small /></span></td>
             <td className="small">{t("src_" + l.source)}{l.campaign && <div className="tiny muted">{l.campaign}</div>}</td><td>{TEMP[l.temperature]}</td>{listCfs.map((f) => { const v = l.custom?.[f.key]; return <td key={f.id} className="small">{v === true ? "✓" : v === false ? "—" : Array.isArray(v) ? v.join(", ") : v ?? ""}</td>; })}<td>{l.ownerName ? <Avatar name={l.ownerName} sm /> : <span className="faint">—</span>}</td>
             <td className="small muted">{rel(l.lastActivityAt)}</td>
             <td className="r" onClick={(e) => e.stopPropagation()}>{l.phone && !l.phone.includes("•") && <div className="row end" style={{ gap: 4 }}>

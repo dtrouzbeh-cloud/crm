@@ -50,6 +50,7 @@ export async function ingestInbound(m: { phoneNumberId: string; from: string; na
     const [msg] = await tx`insert into messages (clinic_id, conversation_id, direction, type, body, media, external_id, status, at) values (${acc.clinicId}, ${cv.id}, ${echo ? "out" : "in"}, ${m.type.replace("echo_", "")}, ${m.body ?? null}, ${m.media ? tx.json(m.media as never) : null}, ${m.id}, ${echo ? "sent" : "received"}, ${new Date(m.ts)})
       on conflict (conversation_id, external_id) do nothing returning id`;
     if (!msg) return { duplicate: true };
+    if (!echo && m.type === "audio" && !m.body) await tx`insert into jobs (clinic_id, type, payload, max_attempts) values (${acc.clinicId}, 'stt.transcribe', ${tx.json({ messageId: Number(msg.id) } as never)}, 3)`;
     await tx`update conversations set last_message_at = ${new Date(m.ts)}, last_preview = ${(m.body ?? "[" + m.type + "]").slice(0, 120)},
       ${echo ? tx`` : tx`last_inbound_at = ${new Date(m.ts)}, unread = unread + 1, status = 'open',`} contact_name = coalesce(contact_name, ${m.name ?? null}) where id = ${cv.id}`;
     await tx`update channel_accounts set last_webhook_at = now(), status = 'connected' where id = ${acc.id}`;
