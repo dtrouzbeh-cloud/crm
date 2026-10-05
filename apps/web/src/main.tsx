@@ -34,6 +34,7 @@ const Finance = lazy(() => import("./pages/Finance.tsx"));
 const Interpreter = lazy(() => import("./pages/Interpreter.tsx"));
 const Duplicates = lazy(() => import("./pages/Duplicates.tsx"));
 const Pipelines = lazy(() => import("./pages/Pipelines.tsx"));
+const Sequences = lazy(() => import("./pages/Sequences.tsx"));
 
 // Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
 addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
@@ -80,6 +81,7 @@ function App() {
       <Route path="/finance/:tab?" component={Finance} />
       <Route path="/interpreter" component={Interpreter} />
       <Route path="/pipelines/:id?" component={Pipelines} />
+      <Route path="/sequences/:id?" component={Sequences} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;

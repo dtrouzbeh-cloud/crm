@@ -1,3 +1,4 @@
+import { isStopMessage, recordConsent } from "../services/consent.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
@@ -47,6 +48,11 @@ export async function ingestInbound(m: { phoneNumberId: string; from: string; na
     if (cv.leadId && !echo) {
       await tx`insert into lead_events (clinic_id, lead_id, type, body, data) values (${acc.clinicId}, ${cv.leadId}, 'whatsapp', ${(m.body ?? "[" + m.type + "]").slice(0, 500)}, ${tx.json({ direction: "in", conversationId: cv.id } as never)})`;
       await tx`update leads set last_activity_at = now() where id = ${cv.leadId}`;
+    }
+    // "STOP" → WhatsApp takip izni iptal, aktif diziler durur
+    if (!echo && cv.patientId && isStopMessage(m.body)) {
+      await recordConsent(tx, acc.clinicId, cv.patientId, { channel: "whatsapp", purpose: "followup", status: "revoked", source: "whatsapp_stop", evidence: { messageId: m.id, text: m.body } });
+      await emit(tx, acc.clinicId, "consent.revoked", cv.patientId, { leadId: cv.leadId, channel: "whatsapp", patientId: cv.patientId });
     }
     if (!echo) await emit(tx, acc.clinicId, "wa.message", cv.id, { conversationId: cv.id, leadId: cv.leadId, name: cv.contactName ?? m.name ?? m.from, ownerId: cv.assigneeId, link: "/inbox/" + cv.id, preview: (m.body ?? "").slice(0, 80) });
     // mesai dışı otomatik yanıt (bir kez / 12 saat)

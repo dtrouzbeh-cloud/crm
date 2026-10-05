@@ -7,6 +7,12 @@ import { deliver } from "./services/mailer.ts";
 export type JobHandler = (payload: Record<string, unknown>, clinicId: string | null) => Promise<void>;
 export const handlers: Record<string, JobHandler> = {
   "mail.send": async (p) => { await deliver(p as never); },
+  // takip dizisi WhatsApp adımı (dış API çağrısı işlemden ayrı, yeniden denenebilir)
+  "sequence.wa": async (p, clinicId) => {
+    const { sendInConversation } = await import("./routes/inbox.ts");
+    const m = p.kind === "text" ? { kind: "text" as const, body: String(p.body), idem: String(p.idem) } : { kind: "template" as const, template: p.template as never, idem: String(p.idem) };
+    await sendInConversation({ clinicId: clinicId!, userId: null as unknown as string }, String(p.conversationId), m);
+  },
   "webhook.dispatch": async (p, clinicId) => { await dispatchWebhook(Number(p.eventId), clinicId!); },
   "wa.autoreply": async (p) => {
     const [cv] = await ownerSql`select cv.*, a.access_token_enc, a.external_id as phone_id, a.config from conversations cv join channel_accounts a on a.id = cv.account_id where cv.id = ${p.conversationId as string}`;

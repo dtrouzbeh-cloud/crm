@@ -12,6 +12,7 @@ import { eventText } from "./Dashboard.tsx";
 import { TaskRow, NewTaskDrawer } from "./Tasks.tsx";
 import { FormsCard } from "../components/FormsCard.tsx";
 import { CustomFieldsCard } from "./settings/Fields.tsx";
+import { SequencesCard, ConsentCard } from "../components/LeadAutomation.tsx";
 
 const MED = ["diabetes", "anticoag", "bisph", "pregnant", "chemo", "smoker", "heart", "allergy"];
 
@@ -76,6 +77,8 @@ export default function LeadDetail() {
         {cases?.length ? <div className="card"><div className="hd"><h2 className="grow">{t("case")}</h2></div><div className="bd col">{cases.map((c: any) => <Link key={c.id} href={`/cases/${c.id}`} className="row" style={{ color: "inherit" }}><b>#{c.number}</b><span className="grow small muted">{rel(c.createdAt)}</span><CaseBadge s={c.status} />{c.lastQuote && <QuoteBadge s={c.lastQuote.status} />}</Link>)}</div></div>
           : can("case.write") && <div className="card pad"><p className="small muted" style={{ margin: "0 0 10px" }}>{t("open_case_hint")}</p><button className="btn pri" onClick={openCase}><Icon n="tooth" />{t("open_case")}</button></div>}
         <FormsCard leadId={id} email={l.email} phone={l.phone} />
+        <SequencesCard leadId={id} />
+        <ConsentCard leadId={id} />
         {data.otherLeads.length > 0 && <div className="card"><div className="hd"><h3 className="grow">{t("other_leads")}</h3></div><div className="bd col">{data.otherLeads.map((o: any) => <Link key={o.id} href={`/leads/${o.id}`} className="row" style={{ color: "inherit" }}>#{o.number}<span className="grow tiny muted">{date(o.createdAt)}</span><StageBadge s={o.stage} /></Link>)}</div></div>}
         {can("lead.delete") && <div className="row"><button className="btn sm ghost" onClick={() => save({ archived: !l.archivedAt })}>{l.archivedAt ? t("unarchive") : t("archive")}</button><span className="grow" />
           <button className="btn sm ghost danger" onClick={async () => { if (await confirmBox(t("delete_lead"), l.fullName, t("delete"), true)) { await del(`/api/leads/${id}`); qc.invalidateQueries({ queryKey: ["leads"] }); nav("/leads"); } }}><Icon n="trash" />{t("delete")}</button></div>}
