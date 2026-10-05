@@ -1,4 +1,5 @@
 import { cleanCustom } from "./records.ts";
+import { salesStageKeys } from "../services/pipelines.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
@@ -179,7 +180,7 @@ export function leadRoutes(app: FastifyInstance) {
     const c = need(ctx(req), "lead.write");
     const { id } = req.params as { id: string };
     const b = parse(leadInput.partial().extend({
-      stage: z.enum(LEAD_STAGES).optional(), lostReason: z.string().max(60).optional().nullable(), lostNote: z.string().max(1000).optional().nullable(),
+      stage: z.string().max(40).optional(), lostReason: z.string().max(60).optional().nullable(), lostNote: z.string().max(1000).optional().nullable(),
       nextFollowUpAt: z.iso.datetime().optional().nullable(), archived: z.boolean().optional(),
       phoneAlt: z.string().max(40).optional().nullable(), timezone: z.string().max(60).optional().nullable(),
     }), req.body);
@@ -188,6 +189,7 @@ export function leadRoutes(app: FastifyInstance) {
     for (const k of Object.keys(b)) if (!sent.has(k)) delete (b as Record<string, unknown>)[k];
     if (b.ownerId !== undefined) need(c, "lead.assign");
     if (b.stage === "lost" && !b.lostReason) throw new HttpError(400, "lost_reason_required", "Kayıp nedeni zorunlu");
+    if (b.stage && !(await withClinic(c.clinicId, (tx) => salesStageKeys(tx, c.clinicId))).includes(b.stage)) throw new HttpError(400, "bad_stage", "Geçersiz aşama");
     return withClinic(c.clinicId, async (tx) => {
       const [cur] = await tx`select l.id, l.stage, l.owner_id, l.patient_id, p.full_name, p.country from leads l join patients p on p.id = l.patient_id where l.id = ${id} ${scopeFilter(tx, c)}`;
       if (!cur) throw notFound("Lead");

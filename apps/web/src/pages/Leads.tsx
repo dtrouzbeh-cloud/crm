@@ -6,7 +6,7 @@ import { get, post, patch, qs } from "../lib/api.ts";
 import { PageHead, Empty, Drawer, toast, toastErr, Avatar, Spinner } from "../components/ui.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
-import { LEAD_STAGES, STAGE_COL, StageBadge, stageLabel, TEMP, flag, FLAGS } from "../lib/format.tsx";
+import { LEAD_STAGES, STAGE_COL, StageBadge, stageLabel, TEMP, flag, FLAGS, salesStageOrder } from "../lib/format.tsx";
 import { FilterBar, SavedViews, filterCount, filterParams, useCustomFields, cfLabel, type LeadFilter } from "../components/LeadFilters.tsx";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import ImportModal from "./ImportModal.tsx";
@@ -24,7 +24,7 @@ export default function Leads() {
   useEffect(() => { try { sessionStorage.setItem("df_leadfilters", JSON.stringify(filters)); } catch { /* yok */ } setPage(0); }, [filters]);
   const { data: cfs } = useCustomFields(); const listCfs = (cfs ?? []).filter((f) => f.showInList);
   const { lang } = useT();
-  const isStage = LEAD_STAGES.includes(tab);
+  const isStage = salesStageOrder().includes(tab) || LEAD_STAGES.includes(tab);
   const fp = filterParams(filters);
   const params = view === "kanban" ? { view: "all", q: dq, limit: 200, ...fp } : { view: isStage ? "all" : tab, stage: isStage ? tab : undefined, q: dq, limit: 50, offset: page * 50, ...fp };
   const { data, isLoading } = useQuery({ queryKey: ["leads", params], queryFn: () => get("/api/leads" + qs(params)), placeholderData: keepPreviousData });
@@ -49,8 +49,8 @@ export default function Leads() {
     {showF && <div className="card" style={{ marginBottom: 10, overflow: "hidden" }}><FilterBar value={filters} onChange={setFilters} /></div>}
     {view === "kanban" ? <Kanban items={data?.items ?? []} onMove={moveStage} /> :
       <div className="card"><div className="tabs" style={{ padding: "0 8px" }}>
-        {[["active", active], ["mine", null], ["all", null], ...LEAD_STAGES.map((s) => [s, stats?.[s] ?? 0])].map(([k, n]) =>
-          <button key={k as string} className={tab === k ? "on" : ""} onClick={() => { setTab(k as string); setPage(0); }}>{LEAD_STAGES.includes(k as string) ? stageLabel(t, k as string) : t("lt_" + k)}{n != null && <span className="bdg">{n as number}</span>}</button>)}</div>
+        {[["active", active], ["mine", null], ["all", null], ...salesStageOrder().map((s) => [s, stats?.[s] ?? 0])].map(([k, n]) =>
+          <button key={k as string} className={tab === k ? "on" : ""} onClick={() => { setTab(k as string); setPage(0); }}>{salesStageOrder().includes(k as string) ? stageLabel(t, k as string) : t("lt_" + k)}{n != null && <span className="bdg">{n as number}</span>}</button>)}</div>
         {isLoading ? <Spinner /> : data?.items?.length ? <div className="twrap"><table className="tbl"><thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("country")}</th><th>{t("status")}</th><th>{t("source")}</th><th>{t("temp")}</th>{listCfs.map((f) => <th key={f.id}>{cfLabel(f, lang)}</th>)}<th>{t("owner")}</th><th>{t("last_act")}</th><th /></tr></thead><tbody>
           {data.items.map((l: any) => <tr key={l.id} className="click" onClick={() => nav(`/leads/${l.id}`)}>
             <td><div className="row"><Avatar name={l.fullName} /><div><div style={{ fontWeight: 600 }}>{l.fullName} {l.overdueTasks > 0 && <span className="bdg err" title={t("g_overdue")}>{l.overdueTasks}</span>}</div><div className="tiny muted">#{l.number} · {l.email ?? ""}</div></div></div></td>
@@ -71,7 +71,7 @@ export default function Leads() {
 
 function Kanban({ items, onMove }: { items: any[]; onMove: (id: string, stage: string, prev: string) => void }) {
   const { t, rel } = useT(); const [, nav] = useLocation(); const [drag, setDrag] = useState<any>(null); const [over, setOver] = useState<string | null>(null);
-  return <div className="kanban">{LEAD_STAGES.map((s) => { const ls = items.filter((l) => l.stage === s);
+  return <div className="kanban">{salesStageOrder().map((s) => { const ls = items.filter((l) => l.stage === s);
     return <div key={s} className={"kcol" + (over === s ? " over" : "")} onDragOver={(e) => { e.preventDefault(); setOver(s); }} onDragLeave={() => setOver(null)}
       onDrop={(e) => { e.preventDefault(); setOver(null); if (drag && drag.stage !== s) onMove(drag.id, s, drag.stage); setDrag(null); }}>
       <div className="kh"><span className="dot" style={{ background: STAGE_COL[s] }} />{stageLabel(t, s)}<span className="bdg" style={{ marginInlineStart: "auto" }}>{ls.length}</span></div>

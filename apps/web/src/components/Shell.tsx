@@ -6,6 +6,7 @@ import { Avatar } from "./ui.tsx";
 import { useT } from "../lib/i18n.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
 import { useRealtime } from "../lib/realtime.ts";
+import { registerSalesStages } from "../lib/format.tsx";
 import { get, post, qs } from "../lib/api.ts";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import { StageBadge, flag } from "../lib/format.tsx";
@@ -29,10 +30,12 @@ export function Shell({ children }: { children: ReactNode }) {
   useEffect(() => { if (me?.clinic?.brandColor) { const r = document.documentElement; r.style.setProperty("--brand", me.clinic.brandColor); r.style.setProperty("--brand-soft", `color-mix(in srgb, ${me.clinic.brandColor} 13%, var(--card))`); } }, [me?.clinic?.brandColor]);
   useEffect(() => setOpen(false), [loc]);
   useRealtime(nav);
+  const { data: pls } = useQuery({ queryKey: ["pipelines"], queryFn: () => get<any[]>("/api/pipelines"), enabled: can("lead.read"), staleTime: 60_000 });
+  useEffect(() => { const sales = pls?.find((p) => p.kind === "sales"); if (sales) registerSalesStages(sales.stages); }, [pls]);
 
   const NAV: NavItem[] = [
     { sec: "sec_work" }, { id: "dash", ic: "dash", to: "/" }, { id: "tasks", ic: "tasks", to: "/tasks", badge: tc?.today }, { id: "inbox", ic: "inbox", to: "/inbox", perm: "inbox.use", badge: ib?.n },
-    { sec: "sec_sales" }, { id: "leads", ic: "users", to: "/leads", perm: "lead.read" }, { id: "quotes", ic: "file", to: "/quotes", perm: "case.read" }, { id: "deals", ic: "deal", to: "/deals", perm: "deal.read" }, { id: "finance", ic: "card", to: "/finance", perm: (can("finance.view") ? "finance.view" : "payment.record") as any },
+    { sec: "sec_sales" }, { id: "leads", ic: "users", to: "/leads", perm: "lead.read" }, { id: "pipelines", ic: "kanban", to: "/pipelines", perm: "lead.read" }, { id: "quotes", ic: "file", to: "/quotes", perm: "case.read" }, { id: "deals", ic: "deal", to: "/deals", perm: "deal.read" }, { id: "finance", ic: "card", to: "/finance", perm: (can("finance.view") ? "finance.view" : "payment.record") as any },
     { sec: "sec_clinic" }, { id: "cases", ic: "tooth", to: "/cases", perm: "case.read", badge: cc?.counts?.pool }, { id: "reception", ic: "desk", to: "/reception", perm: "appointment.read" }, { id: "trips", ic: "plane", to: "/trips", perm: "trip.manage" }, { id: "interpreter", ic: "globe", to: "/interpreter", perm: "appointment.read" },
     { sec: "sec_setup" }, { id: "catalog", ic: "book", to: "/catalog", perm: "catalog.manage" }, { id: "analytics", ic: "chart", to: "/reports", perm: "reports.view" }, { id: "settings", ic: "gear", to: "/settings", perm: "settings.manage" },
   ];

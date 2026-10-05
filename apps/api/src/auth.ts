@@ -8,6 +8,7 @@ import { effectivePermissions, type Role, type Permissions } from "@dentaflow/co
 import { defaultClinicSettings, defaultWorkflowRules } from "./services/defaults.ts";
 import { seedClinicCatalog } from "./services/catalog-seed.ts";
 import { seedClinicForms } from "./services/forms-seed.ts";
+import { ensurePipelines } from "./services/pipelines.ts";
 import { sendMail } from "./services/mailer.ts";
 
 const COOKIE = "df_sess";
@@ -57,6 +58,7 @@ export async function createClinicWithAdmin(input: { clinicName: string; country
     for (const r of defaultWorkflowRules()) await tx`insert into workflow_rules (clinic_id, name, trigger, actions) values (${clinic!.id}, ${r.name}, ${tx.json(r.trigger as never)}, ${tx.json(r.actions as never)})`;
     await seedClinicCatalog(tx as never, clinic!.id as string);
     await seedClinicForms(tx as never, clinic!.id as string, input.language);
+    await ensurePipelines(tx as never, clinic!.id as string);
     return clinic as { id: string; slug: string };
   });
 }

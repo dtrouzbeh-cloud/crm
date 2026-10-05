@@ -123,14 +123,14 @@ function Workflows() {
   const { data: forms } = useQuery({ queryKey: ["form-templates"], queryFn: () => get<any[]>("/api/forms/templates") });
   if (!data) return <Spinner />;
   const save = async (id: string, b: any) => { try { await put(`/api/workflows/${id}`, b); qc.invalidateQueries({ queryKey: ["workflows"] }); toast(t("saved")); } catch (e) { toastErr(e); } };
-  const EVENTS = ["lead.created", "lead.stage", "lead.assigned", "case.created", "case.diagnosed", "quote.sent", "quote.viewed", "quote.accepted", "quote.changes", "quote.declined", "deal.created", "deal.stage", "payment.succeeded", "wa.message", "form.completed"];
+  const EVENTS = ["lead.created", "lead.stage", "lead.assigned", "case.created", "case.diagnosed", "quote.sent", "quote.viewed", "quote.accepted", "quote.changes", "quote.declined", "deal.created", "deal.stage", "payment.succeeded", "wa.message", "form.completed", "pipeline.stage_entered", "pipeline.sla_breached"];
   return <div className="col" style={{ gap: 12 }}>
     <div className="alert info"><Icon n="info" /><span>{t("wf_explain")}</span></div>
     {data.map((w: any) => { const a = w.actions[0] ?? {}; return <div key={w.id} className="card pad"><div className="row wrap" style={{ gap: 10 }}>
       <Switch checked={w.active} onChange={(v) => save(w.id, { active: v })} />
       <input className="inp sm" style={{ maxWidth: 260 }} defaultValue={w.name} onBlur={(e) => save(w.id, { name: e.target.value })} />
       <span className="small muted">{t("when")}</span><select className="inp sm" style={{ width: "auto" }} defaultValue={w.trigger.event} onChange={(e) => save(w.id, { trigger: { ...w.trigger, event: e.target.value } })}>{EVENTS.map((ev) => <option key={ev} value={ev}>{t("evt_" + ev.replace(".", "_"))}</option>)}</select>
-      {(w.trigger.event === "lead.stage" || w.trigger.event === "deal.stage") && <input className="inp sm" style={{ width: 120 }} defaultValue={w.trigger.stage ?? ""} placeholder="stage" onBlur={(e) => save(w.id, { trigger: { ...w.trigger, stage: e.target.value } })} />}
+      {["lead.stage", "deal.stage", "pipeline.stage_entered", "pipeline.sla_breached"].includes(w.trigger.event) && <input className="inp sm" style={{ width: 120 }} defaultValue={w.trigger.stage ?? ""} placeholder="stage" onBlur={(e) => save(w.id, { trigger: { ...w.trigger, stage: e.target.value } })} />}
       <span className="small muted">→</span><select className="inp sm" style={{ width: "auto" }} value={a.type ?? "task"} onChange={(e) => save(w.id, { actions: [e.target.value === "send_form" ? { type: "send_form", templateId: forms?.find((f) => f.active)?.id, email: true } : { type: "task", title: "{name}", dueHours: 1, priority: "med", taskType: "general", assign: "owner" }] })}>
         <option value="task">{t("create_task")}</option><option value="send_form">{t("send_form")}</option></select>
       {a.type === "send_form" ? <>

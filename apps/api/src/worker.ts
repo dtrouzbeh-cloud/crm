@@ -6,6 +6,7 @@ import { handlers as jobHandlers } from "./jobs.ts";
 import { createFormRequest, emailFormRequest } from "./routes/forms.ts";
 import type { Tx } from "./db.ts";
 import { notifyUser } from "./services/notify.ts";
+import { pipelineHooks, checkSla } from "./services/pipelines.ts";
 import { sendMail } from "./services/mailer.ts";
 import { config as appConfig } from "./config.ts";
 
@@ -20,6 +21,7 @@ async function runWorkflows(ev: Ev) {
     const trig = r.trigger as Record<string, unknown>;
     if (trig.stage && trig.stage !== ev.payload.stage) continue;
     if (trig.source && trig.source !== ev.payload.source) continue;
+    if (trig.pipeline && trig.pipeline !== ev.payload.pipeline) continue;
     const leadId = (ev.payload.leadId as string) ?? null;
     let ownerId = (ev.payload.ownerId as string) ?? null;
     if (!ownerId && leadId) { const [l] = await ownerSql`select owner_id from leads where id = ${leadId}`; ownerId = (l?.ownerId as string) ?? null; }
@@ -55,6 +57,7 @@ async function processOutbox(): Promise<number> {
     for (const ev of rows) {
       await runWorkflows(ev).catch((e) => console.error("workflow", ev.type, e));
       await notifyOwner(ev).catch((e) => console.error("notify", e));
+      await pipelineHooks(ev).catch((e) => console.error("pipeline", ev.type, e));
       // giden webhook'lar ve entegrasyonlar için iş oluştur
       await tx`insert into jobs (clinic_id, type, payload) select ${ev.clinicId}, 'webhook.dispatch', ${tx.json({ eventId: ev.id } as never)}
                where exists (select 1 from webhook_endpoints w where w.clinic_id = ${ev.clinicId} and w.active and (w.events @> '{*}' or ${ev.type} = any(w.events)))`;
@@ -111,13 +114,14 @@ async function loop() {
   const listener = postgres(config.databaseOwnerUrl, { max: 1 });
   await listener.listen("outbox", () => wake?.());
   console.log(`DentaFlow worker ${workerId} çalışıyor`);
-  let lastDigest = 0;
+  let lastDigest = 0, lastSla = 0;
   for (;;) {
     let n = 0;
     try { n = (await processOutbox()) + (await processJobs()); } catch (e) { console.error("worker", e); }
+    if (Date.now() - lastSla > 60_000) { lastSla = Date.now(); await checkSla().catch((e) => console.error("sla", e)); }
     if (Date.now() - lastDigest > 10 * 60_000) { lastDigest = Date.now(); await sendDigests().catch((e) => console.error("digest", e)); }
     if (!n) await new Promise<void>((r) => { wake = r; setTimeout(r, 5000); });
   }
 }
 if (import.meta.main) await loop();
-export { processOutbox, processJobs, sendDigests };
+export { processOutbox, processJobs, sendDigests, checkSla };
