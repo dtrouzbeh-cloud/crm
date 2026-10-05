@@ -7,6 +7,7 @@ import { deliver } from "./services/mailer.ts";
 export type JobHandler = (payload: Record<string, unknown>, clinicId: string | null) => Promise<void>;
 export const handlers: Record<string, JobHandler> = {
   "mail.send": async (p) => { await deliver(p as never); },
+  "campaign.send": async (p) => { const { sendCampaignBatch } = await import("./services/campaigns.ts"); await sendCampaignBatch(String(p.id)); },
   "capi.send": async (p) => { const { sendConversion } = await import("./services/ads.ts"); await sendConversion(Number(p.id)); },
   "ads.sync": async (_p, clinicId) => { const { syncMetaSpend } = await import("./services/ads.ts"); await syncMetaSpend(clinicId!, 3); },
   "ai.reply": async (p, clinicId) => { const { aiReplyJob } = await import("./services/ai/agent.ts"); await aiReplyJob(clinicId!, String(p.conversationId)); },

@@ -1,3 +1,4 @@
+import { MyTarget } from "../components/SalesPerf.tsx";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../lib/i18n.tsx";
@@ -30,6 +31,7 @@ export default function Dashboard() {
       <div className="card kpi"><span className="l">{t("k_pool")}</span><span className="v num">{pool?.counts?.pool ?? 0}</span><span className="d"><Link href="/cases">{t("open_pool")} →</Link></span></div>
       <div className="card kpi"><span className="l">⏱ {t("first_response")}</span><span className="v num">{data.kpi.medianResponseMin != null ? Math.round(data.kpi.medianResponseMin) + " dk" : "—"}</span><span className="d muted">medyan · 30 gün</span></div>
     </div>
+    <MyTarget />
     {mc?.totals?.length > 0 && <div className="card pad row wrap" style={{ marginBottom: 16, gap: 18 }}><span>⭐ <b>{t("my_commissions")}</b></span>
       {mc.totals.map((x: any) => <span key={x.currency} className="small"><span className="muted">{t("this_month")}:</span> <b className="num">{money(Number(x.thisMonth ?? 0) / 100, x.currency)}</b> · <span className="muted">{t("cs_pending")}:</span> <b className="num">{money(Number(x.due ?? 0) / 100, x.currency)}</b> · <span className="muted">{t("cs_paid")}:</span> <span className="num">{money(Number(x.paid ?? 0) / 100, x.currency)}</span></span>)}</div>}
     <h3 style={{ margin: "4px 0 8px" }} className="muted small">{t("journey").toUpperCase()}</h3>

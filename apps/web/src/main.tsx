@@ -38,6 +38,7 @@ const Sequences = lazy(() => import("./pages/Sequences.tsx"));
 const Clinical = lazy(() => import("./pages/Clinical.tsx"));
 const WarrantyCard = lazy(() => import("./pages/WarrantyCard.tsx"));
 const LeadForm = lazy(() => import("./pages/LeadForm.tsx"));
+const Campaigns = lazy(() => import("./pages/Campaigns.tsx"));
 
 // Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
 addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
@@ -88,6 +89,7 @@ function App() {
       <Route path="/pipelines/:id?" component={Pipelines} />
       <Route path="/sequences/:id?" component={Sequences} />
       <Route path="/clinical/:tab?" component={Clinical} />
+      <Route path="/campaigns/:id?" component={Campaigns} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;
