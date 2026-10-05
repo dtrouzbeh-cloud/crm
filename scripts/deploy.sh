@@ -11,6 +11,7 @@ rsync -az apps/web/dist/assets/ "$HOST:$DIR/app/apps/web/dist/assets/"
 ssh "$HOST" "find $DIR/app/apps/web/dist/assets -type f -mtime +14 -delete"
 ssh "$HOST" "set -e; cd $DIR/app; npm ci --omit=dev --no-audit --no-fund --loglevel=error; chown -R dentaflow:dentaflow $DIR;
   sudo -u dentaflow node --env-file=$DIR/.env apps/api/src/migrate.ts;
-  systemctl restart dentaflow-api dentaflow-worker; sleep 2; systemctl is-active dentaflow-api dentaflow-worker;
-  curl -fsS http://127.0.0.1:4100/api/health"
+  systemctl restart dentaflow-api dentaflow-worker;
+  for i in \$(seq 1 20); do curl -fsS http://127.0.0.1:4100/api/health && break; sleep 1; done;
+  systemctl is-active dentaflow-api dentaflow-worker; curl -fsS http://127.0.0.1:4100/api/health >/dev/null"
 echo; echo "✓ Dağıtım tamam"
