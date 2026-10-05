@@ -9,6 +9,7 @@ import { useCan } from "../lib/auth.ts";
 import { minor, flag } from "../lib/format.tsx";
 import { vcol } from "@dentaflow/core/chart";
 import { DealInvoices } from "../components/Invoice.tsx";
+import { AmendmentsPanel } from "../components/Amendments.tsx";
 
 const stageLabel = (t: (k: string, p?: any) => string, s: string) => s.startsWith("visit_") ? t("ds_v", { n: s.slice(6) }) : t("ds_" + s);
 
@@ -87,7 +88,7 @@ function DealDrawer({ id, onClose }: { id: string; onClose: () => void }) {
         <td><select className="inp sm" style={{ width: "auto" }} value={v.status} disabled={!can("deal.write")} onChange={(e) => patch(`/api/deals/${id}/visits/${v.visitNo}`, { status: e.target.value }).then(refresh)}>{["planned", "scheduled", "arrived", "in_treatment", "done", "canceled"].map((s) => <option key={s} value={s}>{t("vs_" + s)}</option>)}</select></td>
         <td className="r num">{M(v.plannedMinor)}{Number(v.upsellMinor) > 0 && <div className="tiny" style={{ color: "var(--ok)" }}>+{M(v.upsellMinor)}</div>}</td><td className="r num">{M(v.paidMinor)}</td></tr>)}</tbody></table>}
     {tab === "trip" && <TripEditor data={data} refresh={refresh} />}
-    {tab === "plan" && <PlanProgress data={data} refresh={refresh} />}
+    {tab === "plan" && <><PlanProgress data={data} refresh={refresh} /><AmendmentsPanel deal={data.deal} visits={data.visits} phone={d.phone} /></>}
   </Drawer>;
 }
 

@@ -47,7 +47,7 @@ test("lead oluştur, mükerrer telefonu aynı hastaya bağla, iş akışı göre
   assert.equal(dup.body.duplicate.patientId, a.body.patientId);
   const b = await c.post("/api/leads", { fullName: "J. O'Brien", phone: "+44 7700 900123", source: "whatsapp" });
   assert.equal(b.body.patientId, a.body.patientId);
-  await processOutbox();
+  while (await processOutbox() > 0) { /* kuyruğu boşalt */ }
   const list = await c.get("/api/leads?view=all");
   assert.equal(list.body.total, 2);
   const tasks = await c.get(`/api/tasks?who=all&leadId=${a.body.leadId}`);

@@ -278,7 +278,7 @@ export function convert(cat: Catalog, eur: number, cur: string, prices?: Record<
 }
 const roundTo = (v: number, step: number) => (step > 0 ? Math.round(v / step) * step : Math.round(v));
 export const curStep = (cat: Catalog, cur: string) => (cur === "TRY" ? cat.rounding * 10 : cat.rounding);
-function unitPrice(cat: Catalog, it: PlanItem, cur: string): number {
+export function unitPrice(cat: Catalog, it: PlanItem, cur: string): number {
   if (it.manual) return Number(it.price) || 0;
   if (it.b) { const b = cat.bundle(it.b); if (!b) return 0; const br = brandOf(cat, it);
     if (br && b.brands) return convert(cat, br.price, cur);

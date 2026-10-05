@@ -19,6 +19,7 @@ const CaseWorkspace = lazy(() => import("./pages/case/CaseWorkspace.tsx"));
 const Quotes = lazy(() => import("./pages/Quotes.tsx"));
 const PatientQuote = lazy(() => import("./pages/PatientQuote.tsx"));
 const PatientForm = lazy(() => import("./pages/PatientForm.tsx"));
+const PatientAmendment = lazy(() => import("./pages/PatientAmendment.tsx"));
 const Catalog = lazy(() => import("./pages/Catalog.tsx"));
 const Settings = lazy(() => import("./pages/Settings.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
@@ -30,6 +31,7 @@ const Inbox = lazy(() => import("./pages/Inbox.tsx"));
 const Reports = lazy(() => import("./pages/Reports.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
 const Finance = lazy(() => import("./pages/Finance.tsx"));
+const Interpreter = lazy(() => import("./pages/Interpreter.tsx"));
 
 // Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
 addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
@@ -54,6 +56,7 @@ function App() {
     <Route path="/invite/:token" component={InviteAccept} />
     <Route path="/q/:token">{() => <Suspense fallback={<Spinner />}><PatientQuote /></Suspense>}</Route>
     <Route path="/f/:token">{() => <Suspense fallback={<Spinner />}><PatientForm /></Suspense>}</Route>
+    <Route path="/a/:token">{() => <Suspense fallback={<Spinner />}><PatientAmendment /></Suspense>}</Route>
     <Route>{() => <Authed><Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/leads" component={Leads} />
@@ -72,6 +75,7 @@ function App() {
       <Route path="/reports" component={Reports} />
       <Route path="/admin" component={Admin} />
       <Route path="/finance/:tab?" component={Finance} />
+      <Route path="/interpreter" component={Interpreter} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;
