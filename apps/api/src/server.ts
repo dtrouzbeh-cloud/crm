@@ -53,9 +53,13 @@ export async function buildServer() {
   // Derlenmiş web uygulaması (tek sunucu: API + SPA)
   const webDist = join(import.meta.dirname, "../../web/dist");
   if (existsSync(webDist)) {
-    await app.register(fastifyStatic, { root: webDist, wildcard: false, maxAge: "1h",
-      setHeaders: (res, path) => { if (/\/assets\//.test(path)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); } });
-    app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") ? reply.status(404).send({ error: "not_found" }) : reply.type("text/html").sendFile("index.html"));
+    // wildcard: dosyalar diskten anlık okunur (yeniden derleme/dağıtım sonrası yeni parçalar bulunur)
+    await app.register(fastifyStatic, { root: webDist, wildcard: true, maxAge: 0,
+      setHeaders: (res, path) => res.setHeader("Cache-Control", /\/assets\//.test(path) ? "public, max-age=31536000, immutable" : "no-cache") });
+    // API ve eksik varlık dosyaları gerçek 404 alır; diğer yollar SPA'ya düşer
+    app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") ? reply.status(404).send({ error: "not_found" })
+      : req.url.startsWith("/assets/") ? reply.status(404).header("Cache-Control", "no-store").type("text/plain").send("not found")
+      : reply.header("Cache-Control", "no-cache").type("text/html").sendFile("index.html"));
   }
   return app;
 }

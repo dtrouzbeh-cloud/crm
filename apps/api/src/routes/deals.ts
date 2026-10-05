@@ -4,6 +4,7 @@ import { withClinic, type Tx } from "../db.ts";
 import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { decrypt } from "../lib/crypto.ts";
+import { accrueCommissions } from "../services/finance.ts";
 
 function dealScope(tx: Tx, c: Ctx) {
   return c.perms["deal.read"] === "own" ? tx`and d.owner_id = ${c.userId}` : tx``;
@@ -30,6 +31,7 @@ export async function recordPayment(tx: Tx, clinicId: string, userId: string | n
     left -= amt;
   }
   if (left > 0 && visits.length) await tx`insert into payment_allocations (payment_id, deal_visit_id, clinic_id, amount_minor) values (${pay!.id}, ${visits[visits.length - 1]!.id}, ${clinicId}, ${left}) on conflict (payment_id, deal_visit_id) do update set amount_minor = payment_allocations.amount_minor + excluded.amount_minor`;
+  await accrueCommissions(tx, clinicId, pay!.id as string);
   if (d.stage === "accepted") await tx`update deals set stage = 'deposit' where id = ${dealId}`;
   await tx`insert into lead_events (clinic_id, lead_id, type, body, data, user_id) values (${clinicId}, ${d.leadId}, 'payment', ${p.method}, ${tx.json({ amountMinor: p.amountMinor, currency: p.currency, dealId } as never)}, ${userId})`;
   const amountText = new Intl.NumberFormat("en", { style: "currency", currency: p.currency }).format(p.amountMinor / 100);
@@ -138,6 +140,7 @@ export function dealRoutes(app: FastifyInstance) {
       const allocs = await tx`select deal_visit_id, amount_minor from payment_allocations where payment_id = ${pid}`;
       let left = amt;
       for (const a of allocs.reverse()) { if (left <= 0) break; const x = Math.min(left, Number(a.amountMinor)); await tx`insert into payment_allocations (payment_id, deal_visit_id, clinic_id, amount_minor) values (${r!.id}, ${a.dealVisitId}, ${c.clinicId}, ${-x})`; left -= x; }
+      await accrueCommissions(tx, c.clinicId, r!.id as string);
       await audit(tx, c, "deal.payment." + b.kind, "deal", id, { payment: pid, amountMinor: amt, note: b.note });
       return { id: r!.id };
     });

@@ -96,7 +96,7 @@ function Team() {
 
 const PERM_GROUPS: [string, string[]][] = [
   ["leads", ["lead.read", "lead.write", "lead.delete", "lead.assign", "lead.import", "lead.export", "inbox.use"]],
-  ["clinical", ["case.read", "case.write", "case.diagnose"]], ["sales", ["quote.price", "quote.send", "quote.approve", "discount.max", "deal.read", "deal.write", "payment.record", "payment.refund"]],
+  ["clinical", ["case.read", "case.write", "case.diagnose"]], ["sales", ["quote.price", "quote.send", "quote.approve", "discount.max", "deal.read", "deal.write", "payment.record", "payment.refund", "finance.view", "finance.manage"]],
   ["ops", ["trip.manage", "appointment.read", "appointment.manage", "reception.use", "task.manage"]], ["admin", ["catalog.manage", "settings.manage", "team.manage", "integrations.manage", "billing.manage", "reports.view", "audit.view"]],
   ["fields", ["field.price", "field.phone", "field.email", "field.passport", "field.medical"]]];
 function Roles() {

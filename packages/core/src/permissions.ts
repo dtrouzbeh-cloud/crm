@@ -16,7 +16,7 @@ export interface Permissions {
   "trip.manage": boolean; "appointment.read": Scope; "appointment.manage": boolean; "reception.use": boolean;
   "task.manage": boolean;
   "catalog.manage": boolean; "settings.manage": boolean; "team.manage": boolean; "integrations.manage": boolean; "billing.manage": boolean;
-  "reports.view": Scope; "audit.view": boolean;
+  "reports.view": Scope; "audit.view": boolean; "finance.view": boolean; "finance.manage": boolean;
   "field.price": FieldVis; "field.phone": FieldVis; "field.email": FieldVis; "field.passport": FieldVis; "field.medical": FieldVis;
 }
 export type PermKey = keyof Permissions;
@@ -30,7 +30,7 @@ const NONE: Permissions = {
   "trip.manage": false, "appointment.read": false, "appointment.manage": false, "reception.use": false,
   "task.manage": true,
   "catalog.manage": false, "settings.manage": false, "team.manage": false, "integrations.manage": false, "billing.manage": false,
-  "reports.view": false, "audit.view": false,
+  "reports.view": false, "audit.view": false, "finance.view": false, "finance.manage": false,
   "field.price": "hide", "field.phone": "mask", "field.email": "mask", "field.passport": "hide", "field.medical": "hide",
 };
 
@@ -40,7 +40,7 @@ const ALL: Permissions = Object.fromEntries(Object.entries(NONE).map(([k, v]) =>
 
 export const ROLE_DEFAULTS: Record<Role, Permissions> = {
   admin: { ...ALL },
-  manager: { ...ALL, "settings.manage": false, "team.manage": false, "billing.manage": false, "integrations.manage": false, "discount.max": 15, "payment.refund": false },
+  manager: { ...ALL, "settings.manage": false, "team.manage": false, "billing.manage": false, "integrations.manage": false, "discount.max": 15, "payment.refund": false, "finance.manage": false },
   sales: { ...NONE, "lead.read": "own", "lead.write": true, "inbox.use": "own", "case.read": "own", "case.write": true,
     "quote.price": true, "quote.send": true, "discount.max": 5, "deal.read": "own", "deal.write": true, "payment.record": true,
     "appointment.read": "all", "reports.view": "own", "field.price": "show", "field.phone": "show", "field.email": "show", "field.passport": "mask", "field.medical": "show" },
@@ -50,7 +50,7 @@ export const ROLE_DEFAULTS: Record<Role, Permissions> = {
   reception: { ...NONE, "appointment.read": "all", "appointment.manage": true, "reception.use": true, "payment.record": true, "deal.read": "all",
     "field.phone": "show", "field.passport": "show", "field.price": "show" },
   translator: { ...NONE, "case.read": "own", "appointment.read": "own", "field.medical": "show" },
-  accounting: { ...NONE, "deal.read": "all", "payment.record": true, "payment.refund": true, "reports.view": "all", "field.price": "show", "field.phone": "mask" },
+  accounting: { ...NONE, "finance.view": true, "finance.manage": true, "deal.read": "all", "payment.record": true, "payment.refund": true, "reports.view": "all", "field.price": "show", "field.phone": "mask" },
 };
 
 /** Rol varsayılanı + klinik rol özelleştirmesi + kullanıcı istisnası → etkin izinler */

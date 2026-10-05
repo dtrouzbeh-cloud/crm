@@ -19,6 +19,7 @@ export default function LeadDetail() {
   const { data: me } = useMe(); const search = useSearch();
   const { data, error, refetch } = useQuery({ queryKey: ["lead", id], queryFn: () => get(`/api/leads/${id}`) });
   const { data: team } = useQuery({ queryKey: ["team"], queryFn: () => get("/api/team") });
+  const { data: partners } = useQuery({ queryKey: ["partners"], queryFn: () => get<any[]>("/api/partners") });
   const { data: cases } = useQuery({ queryKey: ["cases", "lead", id], queryFn: async () => (await get("/api/cases?limit=200")).items.filter((c: any) => c.leadId === id), enabled: can("case.read") });
   const [note, setNote] = useState(""); const [evType, setEvType] = useState("note"); const [lost, setLost] = useState(new URLSearchParams(search).has("lost")); const [addTask, setAddTask] = useState(false);
   if (error) return <ErrorBox error={error} retry={refetch} />;
@@ -54,6 +55,7 @@ export default function LeadDetail() {
           <Field k="country" label={t("country")} opts={Object.keys(FLAGS).map((c) => [c, FLAGS[c] + " " + c])} />
           <Field k="language" label={t("language")} opts={[["", "—"], ...Object.entries(LANG_NAMES)]} />
           <Field k="source" label={t("source")} opts={((me?.clinic?.settings?.leadSources as string[]) ?? [l.source]).map((s) => [s, t("src_" + s)])} />
+          {(partners?.length || l.partnerId) ? <Field k="partnerId" label={t("partner")} opts={[["", "—"], ...(partners ?? []).filter((p: any) => p.active || p.id === l.partnerId).map((p: any) => [p.id, p.name] as [string, string])]} /> : null}
           <Field k="temperature" label={t("temp")} opts={["hot", "warm", "cold"].map((x) => [x, TEMP[x] + " " + t("temp_" + x)])} />
           {can("lead.assign") ? <Field k="ownerId" label={t("owner")} opts={[["", "—"], ...(team?.members ?? []).filter((m: any) => m.active).map((m: any) => [m.userId, m.name])]} /> : <label className="f">{t("owner")}<input className="inp sm" disabled value={l.ownerName ?? "—"} /></label>}
           <Field k="interest" label={t("interest")} /><Field k="budget" label={t("budget")} /><Field k="travelWindow" label={t("travel_window")} /><Field k="campaign" label="Kampanya" />

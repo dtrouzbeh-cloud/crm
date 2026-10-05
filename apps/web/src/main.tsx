@@ -29,6 +29,11 @@ const Trips = lazy(() => import("./pages/Trips.tsx"));
 const Inbox = lazy(() => import("./pages/Inbox.tsx"));
 const Reports = lazy(() => import("./pages/Reports.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
+const Finance = lazy(() => import("./pages/Finance.tsx"));
+
+// Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
+addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
+addEventListener("load", () => setTimeout(() => sessionStorage.removeItem("df_reloaded"), 10_000));
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, retry: (n, e: any) => n < 2 && !(e?.status >= 400 && e?.status < 500), refetchOnWindowFocus: true } } });
 
@@ -66,6 +71,7 @@ function App() {
       <Route path="/inbox/:id?" component={Inbox} />
       <Route path="/reports" component={Reports} />
       <Route path="/admin" component={Admin} />
+      <Route path="/finance/:tab?" component={Finance} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;

@@ -27,6 +27,7 @@ const leadInput = z.object({
   utm: z.record(z.string(), z.string()).optional(),
   externalIds: z.record(z.string(), z.string()).optional(),
   marketingConsent: z.boolean().optional(),
+  partnerId: z.uuid().optional().nullable(),
 });
 export type LeadInput = z.infer<typeof leadInput>;
 
@@ -54,9 +55,13 @@ export async function createLead(tx: Tx, c: Pick<Ctx, "clinicId" | "userId">, in
   // Sahip atanmadıysa: dil/round-robin ataması
   const ownerId = input.ownerId ?? (await pickOwner(tx, c.clinicId, input.language ?? null));
   const [{ n: ln }] = await tx`select next_number(${c.clinicId}, 'lead') as n` as unknown as [{ n: string }];
-  const [lead] = await tx`insert into leads (clinic_id, number, patient_id, temperature, source, campaign, owner_id, interest, budget, travel_window, issue, tags, utm, external_ids)
+  // iş ortağı: açıkça verilmiş ya da ?ref=KOD (utm.ref) ile eşleşen ortak
+  let partnerId = input.partnerId ?? null;
+  const ref = input.utm?.ref ?? input.utm?.ref_code ?? null;
+  if (!partnerId && ref) { const [pt] = await tx`select id from partners where clinic_id = ${c.clinicId} and ref_code = ${ref} and active`; partnerId = (pt?.id as string) ?? null; }
+  const [lead] = await tx`insert into leads (clinic_id, number, patient_id, temperature, source, campaign, owner_id, interest, budget, travel_window, issue, tags, utm, external_ids, partner_id)
     values (${c.clinicId}, ${ln}, ${patient!.id}, ${input.temperature}, ${input.source}, ${input.campaign ?? null}, ${ownerId}, ${input.interest ?? null}, ${input.budget ?? null},
-            ${input.travelWindow ?? null}, ${input.issue ?? null}, ${input.tags ?? []}, ${tx.json((input.utm ?? {}) as never)}, ${tx.json((input.externalIds ?? {}) as never)})
+            ${input.travelWindow ?? null}, ${input.issue ?? null}, ${input.tags ?? []}, ${tx.json((input.utm ?? {}) as never)}, ${tx.json((input.externalIds ?? {}) as never)}, ${partnerId})
     returning id, number`;
   await tx`insert into lead_events (clinic_id, lead_id, type, body, data, user_id) values (${c.clinicId}, ${lead!.id}, 'system', 'created', ${tx.json({ source: input.source } as never)}, ${c.userId})`;
   await audit(tx, c, "lead.create", "lead", lead!.id, { source: input.source });
@@ -171,7 +176,7 @@ export function leadRoutes(app: FastifyInstance) {
       const [cur] = await tx`select l.id, l.stage, l.owner_id, l.patient_id, p.full_name, p.country from leads l join patients p on p.id = l.patient_id where l.id = ${id} ${scopeFilter(tx, c)}`;
       if (!cur) throw notFound("Lead");
       const L: Record<string, unknown> = {}, P: Record<string, unknown> = {};
-      const lmap = { temperature: "temperature", source: "source", campaign: "campaign", ownerId: "owner_id", interest: "interest", budget: "budget", travelWindow: "travel_window", issue: "issue", tags: "tags", stage: "stage", lostReason: "lost_reason", lostNote: "lost_note", nextFollowUpAt: "next_follow_up_at" } as const;
+      const lmap = { partnerId: "partner_id", temperature: "temperature", source: "source", campaign: "campaign", ownerId: "owner_id", interest: "interest", budget: "budget", travelWindow: "travel_window", issue: "issue", tags: "tags", stage: "stage", lostReason: "lost_reason", lostNote: "lost_note", nextFollowUpAt: "next_follow_up_at" } as const;
       const pmap = { fullName: "full_name", email: "email", country: "country", city: "city", language: "language", phoneAlt: "phone_alt", timezone: "timezone", marketingConsent: "marketing_consent" } as const;
       for (const [k, col] of Object.entries(lmap)) if ((b as Record<string, unknown>)[k] !== undefined) L[col] = (b as Record<string, unknown>)[k];
       for (const [k, col] of Object.entries(pmap)) if ((b as Record<string, unknown>)[k] !== undefined) P[col] = (b as Record<string, unknown>)[k];

@@ -9,10 +9,11 @@ import { STAGE_COL, stageLabel } from "../lib/format.tsx";
 import { TaskRow } from "./Tasks.tsx";
 
 export default function Dashboard() {
-  const { t, date, rel } = useT(); const { data: me } = useMe();
+  const { t, date, rel, money } = useT(); const { data: me } = useMe();
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => get("/api/dashboard") });
   const { data: tasks } = useQuery({ queryKey: ["tasks", "today"], queryFn: () => get<any[]>("/api/tasks?who=mine&status=open&to=" + encodeURIComponent(new Date(new Date().setHours(23, 59, 59)).toISOString())) });
   const { data: pool } = useQuery({ queryKey: ["cases", "pool-dash"], queryFn: () => get("/api/cases?status=pool&limit=5") });
+  const { data: mc } = useQuery({ queryKey: ["my-commissions"], queryFn: () => get("/api/finance/my-commissions") });
   const h = new Date().getHours(), first = (me?.user?.name ?? "").replace(/^Dr\.?\s*/, "").split(" ")[0];
   if (!data) return <Spinner />;
   const s = data.stages as Record<string, number>;
@@ -29,6 +30,8 @@ export default function Dashboard() {
       <div className="card kpi"><span className="l">{t("k_pool")}</span><span className="v num">{pool?.counts?.pool ?? 0}</span><span className="d"><Link href="/cases">{t("open_pool")} →</Link></span></div>
       <div className="card kpi"><span className="l">⏱ {t("first_response")}</span><span className="v num">{data.kpi.medianResponseMin != null ? Math.round(data.kpi.medianResponseMin) + " dk" : "—"}</span><span className="d muted">medyan · 30 gün</span></div>
     </div>
+    {mc?.totals?.length > 0 && <div className="card pad row wrap" style={{ marginBottom: 16, gap: 18 }}><span>⭐ <b>{t("my_commissions")}</b></span>
+      {mc.totals.map((x: any) => <span key={x.currency} className="small"><span className="muted">{t("this_month")}:</span> <b className="num">{money(Number(x.thisMonth ?? 0) / 100, x.currency)}</b> · <span className="muted">{t("cs_pending")}:</span> <b className="num">{money(Number(x.due ?? 0) / 100, x.currency)}</b> · <span className="muted">{t("cs_paid")}:</span> <span className="num">{money(Number(x.paid ?? 0) / 100, x.currency)}</span></span>)}</div>}
     <h3 style={{ margin: "4px 0 8px" }} className="muted small">{t("journey").toUpperCase()}</h3>
     <div className="journey" style={{ marginBottom: 16, gridTemplateColumns: "repeat(4,1fr)" }}>{J.map(([k, n, to, c]) => <Link key={k} href={to}><span className="n num">{n}</span><span className="s">{t(k)}</span><span className="bar" style={{ background: c }} /></Link>)}</div>
     <div className="grid g3">
