@@ -8,6 +8,8 @@ import { dealRoutes } from "./routes/deals.ts";
 import { paymentRoutes } from "./routes/payments.ts";
 import { opsRoutes } from "./routes/ops.ts";
 import { fileRoutes } from "./routes/files.ts";
+import { inboxRoutes } from "./routes/inbox.ts";
+import { integrationRoutes } from "./routes/integrations.ts";
 export async function registerModules(app: FastifyInstance): Promise<void> {
-  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app);
+  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app); inboxRoutes(app); integrationRoutes(app);
 }

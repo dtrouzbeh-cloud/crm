@@ -18,3 +18,11 @@ export const config = {
   mailFrom: process.env.MAIL_FROM ?? "DentaFlow <no-reply@example.com>",
   sessionDays: 30,
 };
+// Meta (WhatsApp Business Platform, Lead Ads, Messenger/IG) — platformun Meta uygulaması (Tech Provider)
+export const meta = {
+  appId: process.env.META_APP_ID ?? "",
+  appSecret: process.env.META_APP_SECRET ?? "",
+  verifyToken: process.env.META_VERIFY_TOKEN ?? "",
+  configId: process.env.META_ES_CONFIG_ID ?? "",     // Embedded Signup yapılandırma kimliği
+  graph: process.env.META_GRAPH_URL ?? "https://graph.facebook.com/v21.0",
+};

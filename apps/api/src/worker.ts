@@ -49,7 +49,7 @@ async function processOutbox(): Promise<number> {
       await notifyOwner(ev).catch((e) => console.error("notify", e));
       // giden webhook'lar ve entegrasyonlar için iş oluştur
       await tx`insert into jobs (clinic_id, type, payload) select ${ev.clinicId}, 'webhook.dispatch', ${tx.json({ eventId: ev.id } as never)}
-               where exists (select 1 from information_schema.tables where table_name = 'webhook_endpoints')`;
+               where exists (select 1 from webhook_endpoints w where w.clinic_id = ${ev.clinicId} and w.active and (w.events @> '{*}' or ${ev.type} = any(w.events)))`;
     }
     if (rows.length) await tx`update outbox_events set dispatched_at = now() where id = any(${rows.map((r) => r.id)})`;
     return rows;
