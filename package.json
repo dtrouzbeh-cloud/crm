@@ -16,7 +16,7 @@
     "worker": "node --env-file-if-exists=.env apps/api/src/worker.ts",
     "build": "npm run build -w @dentaflow/web",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @dentaflow/web",
-    "test": "node --test --env-file-if-exists=.env 'apps/api/test/**/*.test.ts' 'packages/core/test/**/*.test.ts'"
+    "test": "node --test --test-concurrency=1 --env-file-if-exists=.env 'apps/api/test/**/*.test.ts' 'packages/core/test/**/*.test.ts'"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

@@ -47,6 +47,7 @@ export function eventText(t: (k: string, p?: any) => string, e: { type: string; 
   if (e.type === "quote") return `${t("quote")}: ${e.body === "sent" ? t("qs_sent") : e.body === "viewed" ? t("qs_viewed") : e.body === "accept" ? t("qs_accepted") : e.body === "changes" ? t("qs_changes") : e.body === "decline" ? t("qs_declined") : e.body}`;
   if (e.type === "case") return `${t("case")}: ${e.body === "opened" ? t("act_case") : e.body === "diagnosed" ? t("cs_diagnosed") : e.body}`;
   if (e.type === "deal") return t("act_deal");
+  if (e.type === "form") return `${e.data?.title ?? t("forms")}: ${e.body === "completed" ? t("fs_completed") + (e.data?.nps != null ? ` (NPS ${e.data.nps})` : "") : t("fs_sent")}`;
   if (e.type === "assign") return t("owner") + " ↺";
   return `${t("ev_" + e.type) !== "ev_" + e.type ? t("ev_" + e.type) : e.type}${e.body ? ": " + e.body.slice(0, 80) : ""}`;
 }

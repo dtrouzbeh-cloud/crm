@@ -18,6 +18,7 @@ const Cases = lazy(() => import("./pages/Cases.tsx"));
 const CaseWorkspace = lazy(() => import("./pages/case/CaseWorkspace.tsx"));
 const Quotes = lazy(() => import("./pages/Quotes.tsx"));
 const PatientQuote = lazy(() => import("./pages/PatientQuote.tsx"));
+const PatientForm = lazy(() => import("./pages/PatientForm.tsx"));
 const Catalog = lazy(() => import("./pages/Catalog.tsx"));
 const Settings = lazy(() => import("./pages/Settings.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
@@ -47,6 +48,7 @@ function App() {
     <Route path="/reset" component={Reset} />
     <Route path="/invite/:token" component={InviteAccept} />
     <Route path="/q/:token">{() => <Suspense fallback={<Spinner />}><PatientQuote /></Suspense>}</Route>
+    <Route path="/f/:token">{() => <Suspense fallback={<Spinner />}><PatientForm /></Suspense>}</Route>
     <Route>{() => <Authed><Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/leads" component={Leads} />

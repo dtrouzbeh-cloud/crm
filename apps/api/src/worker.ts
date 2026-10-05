@@ -3,6 +3,8 @@ import postgres from "postgres";
 import { ownerSql } from "./db.ts";
 import { config } from "./config.ts";
 import { handlers as jobHandlers } from "./jobs.ts";
+import { createFormRequest, emailFormRequest } from "./routes/forms.ts";
+import type { Tx } from "./db.ts";
 
 const workerId = `w-${process.pid}`;
 type Ev = { id: number; clinicId: string; type: string; entityId: string | null; payload: Record<string, unknown> };
@@ -24,6 +26,9 @@ async function runWorkflows(ev: Ev) {
         await ownerSql`insert into tasks (clinic_id, title, type, priority, due_at, lead_id, assignee_id, source_rule_id, entity, entity_id)
           values (${ev.clinicId}, ${render(String(a.title), ev.payload)}, ${String(a.taskType ?? "general")}, ${String(a.priority ?? "med")},
                   now() + ${Number(a.dueHours ?? 0) + " hours"}::interval, ${leadId}, ${assignee}, ${r.id}, ${(ev.payload.entity as string) ?? null}, ${(ev.payload.entityRef as string) ?? null})`;
+      } else if (a.type === "send_form" && leadId && a.templateId) {
+        const f = await ownerSql.begin((tx) => createFormRequest(tx as unknown as Tx, ev.clinicId, null, String(a.templateId), leadId, (ev.payload.dealId as string) ?? null));
+        if (a.email !== false) await emailFormRequest(ev.clinicId, f).catch((e) => console.error("form mail", e));
       } else if (a.type === "notify" && ownerId) {
         await ownerSql`insert into notifications (clinic_id, user_id, type, title, link) values (${ev.clinicId}, ${ownerId}, ${ev.type}, ${render(String(a.title), ev.payload)}, ${leadId ? "/leads/" + leadId : null})`;
       }
@@ -35,7 +40,7 @@ async function runWorkflows(ev: Ev) {
 
 async function notifyOwner(ev: Ev) {
   const map: Record<string, string> = { "lead.assigned": "Size yeni bir lead atandı: {name}", "quote.viewed": "{name} teklifi görüntüledi", "quote.accepted": "{name} teklifi KABUL ETTİ 🎉",
-    "quote.changes": "{name} teklifte değişiklik istedi", "payment.succeeded": "{name} ödeme yaptı: {amountText}", "wa.message": "{name}: yeni WhatsApp mesajı" };
+    "quote.changes": "{name} teklifte değişiklik istedi", "payment.succeeded": "{name} ödeme yaptı: {amountText}", "wa.message": "{name}: yeni WhatsApp mesajı", "form.completed": "{name} formu doldurdu: {title}" };
   const tpl = map[ev.type]; if (!tpl) return;
   const uid = (ev.payload.ownerId as string) ?? null; if (!uid) return;
   await ownerSql`insert into notifications (clinic_id, user_id, type, title, link) values (${ev.clinicId}, ${uid}, ${ev.type}, ${render(tpl, ev.payload)}, ${(ev.payload.link as string) ?? (ev.payload.leadId ? "/leads/" + ev.payload.leadId : null)})`;

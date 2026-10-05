@@ -12,8 +12,9 @@ import { LANG_NAMES } from "@dentaflow/core/i18n";
 import PaymentsTab from "./settings/Payments.tsx";
 import IntegrationsTab from "./settings/Integrations.tsx";
 import BillingTab from "./settings/Billing.tsx";
+import FormsTab from "./settings/Forms.tsx";
 
-const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
+const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["forms", "forms", "pen"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
 
 export default function Settings() {
   const { tab = "general" } = useParams<{ tab?: string }>(); const [, nav] = useLocation(); const { t } = useT();
@@ -21,7 +22,7 @@ export default function Settings() {
     <PageHead title={t("nav_settings")} sub={t("settings_sub")} />
     <div className="tabs" style={{ marginBottom: 14 }}>{TABS.map(([k, l, ic]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => nav(`/settings/${k}`)}><Icon n={ic} size={15} />{t(l)}</button>)}</div>
     {tab === "general" && <General />}{tab === "team" && <Team />}{tab === "roles" && <Roles />}{tab === "workflows" && <Workflows />}{tab === "content" && <Content />}{tab === "audit" && <Audit />}
-    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}
+    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}{tab === "forms" && <FormsTab />}
   </>;
 }
 function LazyTab({ name }: { name: string }) {
@@ -118,19 +119,26 @@ function Roles() {
 function Workflows() {
   const { t } = useT(); const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["workflows"], queryFn: () => get("/api/workflows") });
+  const { data: forms } = useQuery({ queryKey: ["form-templates"], queryFn: () => get<any[]>("/api/forms/templates") });
   if (!data) return <Spinner />;
   const save = async (id: string, b: any) => { try { await put(`/api/workflows/${id}`, b); qc.invalidateQueries({ queryKey: ["workflows"] }); toast(t("saved")); } catch (e) { toastErr(e); } };
-  const EVENTS = ["lead.created", "lead.stage", "lead.assigned", "case.created", "case.diagnosed", "quote.sent", "quote.viewed", "quote.accepted", "quote.changes", "quote.declined", "deal.created", "payment.succeeded", "wa.message"];
+  const EVENTS = ["lead.created", "lead.stage", "lead.assigned", "case.created", "case.diagnosed", "quote.sent", "quote.viewed", "quote.accepted", "quote.changes", "quote.declined", "deal.created", "deal.stage", "payment.succeeded", "wa.message", "form.completed"];
   return <div className="col" style={{ gap: 12 }}>
     <div className="alert info"><Icon n="info" /><span>{t("wf_explain")}</span></div>
     {data.map((w: any) => { const a = w.actions[0] ?? {}; return <div key={w.id} className="card pad"><div className="row wrap" style={{ gap: 10 }}>
       <Switch checked={w.active} onChange={(v) => save(w.id, { active: v })} />
       <input className="inp sm" style={{ maxWidth: 260 }} defaultValue={w.name} onBlur={(e) => save(w.id, { name: e.target.value })} />
       <span className="small muted">{t("when")}</span><select className="inp sm" style={{ width: "auto" }} defaultValue={w.trigger.event} onChange={(e) => save(w.id, { trigger: { ...w.trigger, event: e.target.value } })}>{EVENTS.map((ev) => <option key={ev} value={ev}>{t("evt_" + ev.replace(".", "_"))}</option>)}</select>
-      {w.trigger.event === "lead.stage" && <input className="inp sm" style={{ width: 120 }} defaultValue={w.trigger.stage ?? ""} placeholder="stage" onBlur={(e) => save(w.id, { trigger: { ...w.trigger, stage: e.target.value } })} />}
-      <span className="small muted">→ {t("create_task")}</span><input className="inp sm grow" defaultValue={a.title} onBlur={(e) => save(w.id, { actions: [{ ...a, title: e.target.value }] })} />
+      {(w.trigger.event === "lead.stage" || w.trigger.event === "deal.stage") && <input className="inp sm" style={{ width: 120 }} defaultValue={w.trigger.stage ?? ""} placeholder="stage" onBlur={(e) => save(w.id, { trigger: { ...w.trigger, stage: e.target.value } })} />}
+      <span className="small muted">→</span><select className="inp sm" style={{ width: "auto" }} value={a.type ?? "task"} onChange={(e) => save(w.id, { actions: [e.target.value === "send_form" ? { type: "send_form", templateId: forms?.find((f) => f.active)?.id, email: true } : { type: "task", title: "{name}", dueHours: 1, priority: "med", taskType: "general", assign: "owner" }] })}>
+        <option value="task">{t("create_task")}</option><option value="send_form">{t("send_form")}</option></select>
+      {a.type === "send_form" ? <>
+        <select className="inp sm grow" value={a.templateId ?? ""} onChange={(e) => save(w.id, { actions: [{ ...a, templateId: e.target.value }] })}>{(forms ?? []).filter((f) => f.active).map((f) => <option key={f.id} value={f.id}>{f.name} · {f.lang.toUpperCase()}</option>)}</select>
+        <label className="row tiny muted" style={{ gap: 4 }}><input type="checkbox" checked={a.email !== false} onChange={(e) => save(w.id, { actions: [{ ...a, email: e.target.checked }] })} />{t("email")}</label>
+      </> : <>
+      <input className="inp sm grow" defaultValue={a.title} onBlur={(e) => save(w.id, { actions: [{ ...a, title: e.target.value }] })} />
       <input className="inp sm num" type="number" style={{ width: 64 }} defaultValue={a.dueHours} title={t("due_hours")} onBlur={(e) => save(w.id, { actions: [{ ...a, dueHours: +e.target.value }] })} /><span className="tiny muted">{t("hours")}</span>
-      <select className="inp sm" style={{ width: "auto" }} defaultValue={a.priority} onChange={(e) => save(w.id, { actions: [{ ...a, priority: e.target.value }] })}>{["high", "med", "low"].map((p) => <option key={p} value={p}>{t("p_" + p)}</option>)}</select>
+      <select className="inp sm" style={{ width: "auto" }} defaultValue={a.priority} onChange={(e) => save(w.id, { actions: [{ ...a, priority: e.target.value }] })}>{["high", "med", "low"].map((p) => <option key={p} value={p}>{t("p_" + p)}</option>)}</select></>}
       <span className="tiny muted">{w.runs}×</span><button className="btn xs ghost icon danger" onClick={async () => { if (await confirmBox(t("delete"), w.name, t("delete"), true)) { await del(`/api/workflows/${w.id}`); qc.invalidateQueries({ queryKey: ["workflows"] }); } }}><Icon n="trash" /></button></div></div>; })}
     <button className="btn" style={{ alignSelf: "flex-start" }} onClick={() => save("new", { name: t("new_rule"), trigger: { event: "lead.created" }, actions: [{ type: "task", title: "{name}", dueHours: 1, priority: "med", taskType: "general", assign: "owner" }] })}><Icon n="plus" />{t("new_rule")}</button>
   </div>;

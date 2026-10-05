@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 export const IC: Record<string, string> = {
+  pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   dash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
   tooth:'<path d="M7 3c-2.5 0-4 2-3.5 5 .4 2.5 1.2 4.5 1.8 7.5.4 2 1 3.5 2.2 3.5 1.3 0 1.6-1.6 2-3.6.3-1.3.8-2.4 2.5-2.4s2.2 1.1 2.5 2.4c.4 2 .7 3.6 2 3.6 1.2 0 1.8-1.5 2.2-3.5.6-3 1.4-5 1.8-7.5.5-3-1-5-3.5-5-2 0-3 1-5 1s-3-1-5-1z"/>',
