@@ -166,7 +166,7 @@ export type Severity = "block" | "warn" | "info";
 export interface RuleHit { sev: Severity; code: string; p: Record<string, string | number>; v?: number }
 export interface Medical { flags?: string[]; age?: number | null }
 export const BLOCK_RULES = ["B1", "B3", "B4", "B5", "C1", "C1b", "MINV", "EMPTY"];
-export const WARN_RULES = ["VISIT", "B6", "BRIDGE", "SINUS_NOIMP", "SINUS_LOW", "BONE", "E1", "PRESENT", "D1", "PREREQ", "M1", "M2", "M3", "M4", "M5", "M6"];
+export const WARN_RULES = ["VISIT", "B6", "BRIDGE", "SINUS_NOIMP", "SINUS_LOW", "BONE", "PRESENT", "D1", "PREREQ", "M1", "M2", "M3", "M4", "M5", "M6"];
 
 export function checkRules(cat: Catalog, situation: Situation, items: PlanItem[], visits: number, med: Medical, lang = "en", jawLabel: (j: "u" | "l") => string = (j) => j): RuleHit[] {
   const R: RuleHit[] = [], on = (k: string) => cat.rules[k] !== false, flags = new Set(med.flags ?? []);
@@ -211,7 +211,6 @@ export function checkRules(cat: Catalog, situation: Situation, items: PlanItem[]
   if (on("SINUS_LOW")) for (const q of [1, 2]) { const imp = ex.teeth.filter((e) => e.render === "implant" && quadOf(e.t) === q && POSTERIOR_UP.includes(e.t) && sit[e.t]?.f?.sinusSark);
     if (imp.length && !sinusT.some((e) => quadOf(e.t) === q)) push("warn", "SINUS_LOW", { teeth: imp.map((e) => e.t).join(", ") }); }
   if (on("BONE")) { const bad = ex.teeth.filter((e) => e.render === "implant" && sit[e.t]?.f?.kemikAz && e.form !== "short" && !has(e.t, "graft")).map((e) => e.t); if (bad.length) push("warn", "BONE", { teeth: bad.join(", ") }); }
-  if (on("E1")) { const bad = ex.teeth.filter((e) => e.txId === "implant" && (byT[e.t] ?? []).some((o) => o.render === "ext" && o.v === e.v)).map((e) => e.t); if (bad.length) push("info", "E1", { teeth: bad.join(", ") }); }
   if (on("PRESENT")) { const bad = ex.teeth.filter((e) => e.render === "implant" && !finalS[e.t]!.cekim && (!sit[e.t] || ["intact", "rct", "crown", "caries", "comp", "amalg", "inlay", "veneer", "bridge", "other"].includes(sit[e.t]!.s ?? "intact"))).map((e) => e.t); if (bad.length) push("warn", "PRESENT", { teeth: bad.join(", ") }); }
   if (on("D1")) { const wv = items.filter((i) => i.tx === "whitening").map((i) => i.v), cv = ex.teeth.filter((e) => e.render === "crown" || e.render === "veneer").map((e) => e.v); if (wv.length && cv.length && Math.max(...wv) > Math.min(...cv)) push("warn", "D1"); }
   if (on("PREREQ")) for (const it of items) {

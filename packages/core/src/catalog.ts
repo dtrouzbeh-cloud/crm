@@ -35,7 +35,6 @@ export const DEFAULT_TREATMENTS: Treatment[] = [
   TX("implant","imp",["Dental implant","Dental implant","Zahnimplantat","زرعة سنية"],"tooth","implant",450,{visits:[1,2],color:"#64748B",
     brands:[{id:"b_impl",n:"Implance",price:300,form:"std"},{id:"b_osst",n:"Osstem",price:380,form:"std"},{id:"b_neod",n:"Neodent (Straumann Group)",price:450,form:"std"},{id:"b_isys",n:"I-system (kısa / short)",price:550,form:"short"},{id:"b_ilnq",n:"I-linq (ince / narrow)",price:500,form:"narrow"},{id:"b_nobel",n:"Nobel Biocare",price:750,form:"std"},{id:"b_strm",n:"Straumann BLX",price:850,form:"std"}],
     desc:["Eksik dişin kökünün yerini alan titanyum vida.","A titanium screw that replaces the root of a missing tooth.","Eine Titanschraube, die die Wurzel eines fehlenden Zahns ersetzt.","برغي من التيتانيوم يحل محل جذر السن المفقود."]}),
-  TX("implant_imm","imp",["Anında implant","Immediate implant","Sofortimplantat","زرعة فورية"],"tooth","implant",550,{visits:[1],color:"#475569"}),
   TX("crown_imp","imp",["İmplant üstü zirkonyum kron","Zirconia crown on implant","Zirkonkrone auf Implantat","تاج زركونيا على الزرعة"],"tooth","crown",220,{mat:"zr",visits:[2,3],needsImplant:true,color:"#2E6F95"}),
   TX("abutment","imp",["Abutment","Abutment","Abutment","دعامة"],"tooth","none",120,{visits:[2,3],needsImplant:true,color:"#94A3B8"}),
 
