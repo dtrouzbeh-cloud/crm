@@ -1,3 +1,4 @@
+import { AiBar } from "../components/AiBar.tsx";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -57,9 +58,10 @@ function Chat({ id }: { id: string }) {
           {m.type === "template" && <div className="tiny muted">📄 {m.template?.name}</div>}
           {m.media && <div className="tiny muted">📎 {m.type} {m.media.filename ?? ""}</div>}
           {m.body}</div>
-        <div className="tiny faint" style={{ textAlign: m.direction === "in" ? "start" : "end", marginTop: 2 }}>{m.userName ? m.userName + " · " : ""}{date(m.at, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })} {m.direction === "out" && ({ queued: "⏳", sent: "✓", delivered: "✓✓", read: "✓✓ 👁", failed: "⚠ " + (m.error ?? "") } as Record<string, string>)[m.status]}</div></div>)}
+        <div className="tiny faint" style={{ textAlign: m.direction === "in" ? "start" : "end", marginTop: 2 }}>{m.ai ? "🤖 AI · " : m.userName ? m.userName + " · " : ""}{date(m.at, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })} {m.direction === "out" && ({ queued: "⏳", sent: "✓", delivered: "✓✓", read: "✓✓ 👁", failed: "⚠ " + (m.error ?? "") } as Record<string, string>)[m.status]}</div></div>)}
       <div ref={end} /></div>
     <div style={{ borderTop: "1px solid var(--line)", padding: 10 }} className="col">
+      <AiBar convId={id} onUse={(x) => { setMode("msg"); setText(x); }} onSent={refresh} />
       {!cv.windowOpen && mode === "msg" && <div className="alert warn"><Icon n="clock" /><span className="grow">{t("window_closed")}</span><button className="btn sm" onClick={() => setTpl(true)}>{t("send_template")}</button></div>}
       <div className="row" style={{ gap: 6 }}><div className="seg"><button className={mode === "msg" ? "on" : ""} onClick={() => setMode("msg")}>{t("message")}</button><button className={mode === "note" ? "on" : ""} onClick={() => setMode("note")}>{t("internal_note")}</button></div>
         {canned?.length ? <select className="inp sm" style={{ width: "auto" }} value="" onChange={(e) => { const c = canned.find((x) => x.id === e.target.value); if (c) setText(c.body.replace("{name}", (cv.contactName ?? "").split(" ")[0]).replace("{agent}", me?.user?.name ?? "")); }}><option value="">⚡ {t("canned")}</option>{canned.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</select> : null}

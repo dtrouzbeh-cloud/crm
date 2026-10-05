@@ -136,7 +136,23 @@ async function runStep(e: any, step: any): Promise<Result> {
         return { status: "sent", channel: "form", detail: { formId: f.id } };
       }
       case "sms": return { status: "skipped", channel: "sms", detail: { reason: "sms_not_configured" } };
-      case "ai_message": case "ai_call": return { status: "skipped", channel: step.kind, detail: { reason: "ai_not_enabled" } };
+      case "ai_message": {
+        const { aiAvailable, complete, MODELS } = await import("./ai/llm.ts");
+        if (!(await aiAvailable(e.clinicId))) return { status: "skipped", channel: "ai_message", detail: { reason: "ai_not_enabled" } };
+        const channel = cfg.channel === "email" ? "email" : "whatsapp";
+        const ok = await contactAllowed(tx, e.clinicId, lead.patientId, channel, marketing ? "marketing" : "followup"); if (!ok.ok) return { status: "skipped", channel, detail: { reason: ok.reason } };
+        const cv = channel === "whatsapp" ? await conversationFor(tx, e.clinicId, lead) : null;
+        if (channel === "whatsapp" && (!cv || !inWindow(cv.lastInboundAt))) return { status: "skipped", channel, detail: { reason: cv ? "window_closed_no_template" : "no_whatsapp" } };
+        if (channel === "email" && !lead.email) return { status: "skipped", channel, detail: { reason: "no_email" } };
+        const r = await complete(e.clinicId, { model: MODELS.fast, maxTokens: 300, system: `${clinic!.name} diş kliniği adına hastaya kişisel takip mesajı yaz. Hastanın dili: ${lang}. Kısa (en fazla 3 cümle), sıcak, satış baskısı yok, garanti/indirim vaadi yok, teşhis yok. Yalnız mesaj metnini yaz.`,
+          messages: [{ role: "user", content: `Amaç: ${pick(cfg.prompt, lang) || "nazik takip"}\nHasta: ${lead.fullName}, ilgi: ${lead.interest ?? "-"}, aşama: ${lead.stage}, ülke: ${lead.country ?? "-"}\nSorumlu: ${owner?.name ?? clinic!.name}` }] });
+        await ownerSql`insert into ai_usage (clinic_id, day, purpose, calls, tokens_in, tokens_out) values (${e.clinicId}, current_date, 'sequence', 1, ${r.usage.input}, ${r.usage.output}) on conflict (clinic_id, day, purpose) do update set calls = ai_usage.calls + 1, tokens_in = ai_usage.tokens_in + excluded.tokens_in, tokens_out = ai_usage.tokens_out + excluded.tokens_out`;
+        if (!r.text) return { status: "failed", channel, detail: { error: "empty" } };
+        if (channel === "email") { await sendMail(lead.email, render(pick(cfg.subject, lang) || clinic!.name, x), r.text, { clinicId: e.clinicId, fromName: clinic!.name }); return { status: "sent", channel, detail: { ai: true } }; }
+        await tx`insert into jobs (clinic_id, type, payload, dedupe_key) values (${e.clinicId}, 'sequence.wa', ${tx.json({ conversationId: cv!.id, kind: "text", body: r.text, idem: `seq:${e.id}:${step.id}`, ai: true } as never)}, ${"seq:" + e.id + ":" + step.id}) on conflict do nothing`;
+        return { status: "sent", channel, detail: { ai: true } };
+      }
+      case "ai_call": return { status: "skipped", channel: step.kind, detail: { reason: "ai_not_enabled" } };
     }
     return { status: "skipped", detail: { reason: "unknown_step" } };
   });

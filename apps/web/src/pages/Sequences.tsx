@@ -11,7 +11,7 @@ import { salesStageOrder, stageLabel } from "../lib/format.tsx";
 
 const KINDS = ["whatsapp", "email", "task", "stage", "tag", "form", "wait", "sms", "ai_message", "ai_call"] as const;
 const KIND_IC: Record<string, string> = { whatsapp: "wa", email: "mail", task: "tasks", stage: "kanban", tag: "list", form: "pen", wait: "clock", sms: "phone", ai_message: "spark", ai_call: "phone" };
-const SOON = new Set(["sms", "ai_message", "ai_call"]);
+const SOON = new Set(["sms", "ai_call"]);
 const EVENTS = ["", "lead.created", "lead.stage", "quote.sent", "quote.viewed", "deal.created", "deal.stage", "pipeline.stage_entered", "pipeline.sla_breached", "form.completed", "recall.due"];
 const STOPS = ["replied", "quote_viewed", "quote_accepted", "deal_created", "stage_won", "stage_lost", "stage_changed", "form_completed", "paid", "opted_out"];
 const LANGS = ["tr", "en", "de", "ar"];
@@ -113,6 +113,8 @@ function StepCard({ i, st, ro, forms, onChange, onMove, onRemove, stats }: { i: 
       {st.kind === "stage" && <div className="row wrap" style={{ gap: 6 }}><select className="inp sm" style={{ width: "auto" }} disabled={ro} value={cfg.pipeline ?? "sales"} onChange={(e) => setCfg({ pipeline: e.target.value, stageKey: "" })}>{["sales", "nurture", "aftercare", "recall"].map((k) => <option key={k} value={k}>{k}</option>)}</select>
         {(cfg.pipeline ?? "sales") === "sales" ? <select className="inp sm" style={{ width: "auto" }} disabled={ro} value={cfg.stageKey ?? ""} onChange={(e) => setCfg({ stageKey: e.target.value })}><option value="">—</option>{salesStageOrder().map((k) => <option key={k} value={k}>{stageLabel(t, k)}</option>)}</select>
           : <input className="inp sm" style={{ width: 140 }} disabled={ro} placeholder="stage key" value={cfg.stageKey ?? ""} onChange={(e) => setCfg({ stageKey: e.target.value })} />}</div>}
+      {st.kind === "ai_message" && <div className="col" style={{ gap: 6 }}><div className="row" style={{ gap: 6 }}><select className="inp sm" style={{ width: "auto" }} disabled={ro} value={cfg.channel ?? "whatsapp"} onChange={(e) => setCfg({ channel: e.target.value })}><option value="whatsapp">WhatsApp</option><option value="email">E-posta</option></select>
+        <span className="tiny muted">{t("ai_step_hint")}</span></div><textarea className="inp" rows={2} disabled={ro} placeholder={t("ai_step_prompt_ph")} value={cfg.prompt?.tr ?? cfg.prompt ?? ""} onChange={(e) => setCfg({ prompt: { tr: e.target.value, en: e.target.value } })} /></div>}
       {st.kind === "tag" && <input className="inp sm" style={{ width: 200 }} disabled={ro} placeholder={t("tag")} value={cfg.tag ?? ""} onChange={(e) => setCfg({ tag: e.target.value })} />}
       {st.kind === "form" && <select className="inp sm" disabled={ro} value={cfg.templateId ?? ""} onChange={(e) => setCfg({ templateId: e.target.value })}><option value="">—</option>{forms.filter((f) => f.active).map((f) => <option key={f.id} value={f.id}>{f.name} · {f.lang.toUpperCase()}</option>)}</select>}
       {SOON.has(st.kind) && <div className="tiny muted">⏳ {t("coming_soon")}</div>}

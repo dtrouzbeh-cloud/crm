@@ -7,11 +7,13 @@ import { deliver } from "./services/mailer.ts";
 export type JobHandler = (payload: Record<string, unknown>, clinicId: string | null) => Promise<void>;
 export const handlers: Record<string, JobHandler> = {
   "mail.send": async (p) => { await deliver(p as never); },
+  "ai.reply": async (p, clinicId) => { const { aiReplyJob } = await import("./services/ai/agent.ts"); await aiReplyJob(clinicId!, String(p.conversationId)); },
   // takip dizisi WhatsApp adımı (dış API çağrısı işlemden ayrı, yeniden denenebilir)
   "sequence.wa": async (p, clinicId) => {
     const { sendInConversation } = await import("./routes/inbox.ts");
     const m = p.kind === "text" ? { kind: "text" as const, body: String(p.body), idem: String(p.idem) } : { kind: "template" as const, template: p.template as never, idem: String(p.idem) };
     await sendInConversation({ clinicId: clinicId!, userId: null as unknown as string }, String(p.conversationId), m);
+    if (p.ai) { const { ownerSql } = await import("./db.ts"); await ownerSql`update messages set ai = true where conversation_id = ${String(p.conversationId)} and idempotency_key = ${String(p.idem)}`; }
   },
   "webhook.dispatch": async (p, clinicId) => { await dispatchWebhook(Number(p.eventId), clinicId!); },
   "wa.autoreply": async (p) => {

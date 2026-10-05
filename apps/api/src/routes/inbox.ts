@@ -129,7 +129,7 @@ export function inboxRoutes(app: FastifyInstance) {
     const c = need(ctx(req), "inbox.use"); const { id } = req.params as { id: string };
     return withClinic(c.clinicId, async (tx) => {
       const [cv] = await tx`select cv.*, a.name as account_name from conversations cv join channel_accounts a on a.id = cv.account_id where cv.id = ${id} ${inboxScope(tx, c)}`; if (!cv) throw notFound("Konuşma");
-      const msgs = await tx`select m.id, m.direction, m.type, m.body, m.media, m.template, m.status, m.error, m.at, u.name as user_name from messages m left join users u on u.id = m.user_id where m.conversation_id = ${id} order by m.id desc limit 200`;
+      const msgs = await tx`select m.id, m.direction, m.type, m.body, m.media, m.template, m.status, m.error, m.at, m.ai, u.name as user_name from messages m left join users u on u.id = m.user_id where m.conversation_id = ${id} order by m.id desc limit 200`;
       if (cv.unread) await tx`update conversations set unread = 0 where id = ${id}`;
       return { conversation: { ...cv, windowOpen: inWindow(cv.lastInboundAt) }, messages: msgs.reverse() };
     });

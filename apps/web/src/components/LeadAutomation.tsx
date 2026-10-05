@@ -44,3 +44,9 @@ export function ConsentCard({ leadId }: { leadId: string }) {
     {hist && <div className="col" style={{ gap: 2, marginTop: 8 }}>{data.history.length ? data.history.map((h: any) => <div key={h.id} className="tiny muted">{date(h.at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {t("ch_" + h.channel)} · {t(h.purpose === "marketing" ? "marketing" : "followup_msgs")} · <b>{h.status === "granted" ? t("allowed") : t("not_allowed")}</b> · {t("cs_src_" + h.source)}{h.userName ? " · " + h.userName : ""}</div>) : <span className="tiny muted">{t("none")}</span>}</div>}
   </div></div>;
 }
+
+export function AiSummaryCard({ leadId }: { leadId: string }) {
+  const { t } = useT(); const [sum, setSum] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  return <div className="card"><div className="hd"><h2 className="grow">✨ {t("ai_summary")}</h2><button className="btn sm" disabled={busy} onClick={async () => { setBusy(true); try { setSum((await post(`/api/leads/${leadId}/ai-summary`, {})).summary); } catch (e) { toastErr(e); } finally { setBusy(false); } }}>{busy ? "…" : sum ? t("refresh") : t("generate")}</button></div>
+    {sum && <div className="bd small" style={{ whiteSpace: "pre-wrap" }}>{sum}</div>}</div>;
+}

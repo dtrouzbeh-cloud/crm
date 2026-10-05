@@ -9,6 +9,7 @@ import { notifyUser } from "./services/notify.ts";
 import { pipelineHooks, checkSla } from "./services/pipelines.ts";
 import { sequenceHooks, runDueSequences } from "./services/sequences.ts";
 import { recallHooks, activateDueRecalls } from "./services/recalls.ts";
+import { aiHooks } from "./services/ai/agent.ts";
 import { sendMail } from "./services/mailer.ts";
 import { config as appConfig } from "./config.ts";
 
@@ -61,6 +62,7 @@ async function processOutbox(): Promise<number> {
       await notifyOwner(ev).catch((e) => console.error("notify", e));
       await pipelineHooks(ev).catch((e) => console.error("pipeline", ev.type, e));
       await recallHooks(ev).catch((e) => console.error("recall", ev.type, e));
+      await aiHooks(ev).catch((e) => console.error("ai", ev.type, e));
       await sequenceHooks(ev).catch((e) => console.error("sequence", ev.type, e));
       // giden webhook'lar ve entegrasyonlar için iş oluştur
       await tx`insert into jobs (clinic_id, type, payload) select ${ev.clinicId}, 'webhook.dispatch', ${tx.json({ eventId: ev.id } as never)}

@@ -22,6 +22,7 @@ import { pipelineRoutes } from "./routes/pipelines.ts";
 import { sequenceRoutes } from "./routes/sequences.ts";
 import { recallRoutes } from "./routes/recalls.ts";
 import { clinicalRoutes } from "./routes/clinical.ts";
+import { aiRoutes } from "./routes/ai.ts";
 export async function registerModules(app: FastifyInstance): Promise<void> {
-  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app); inboxRoutes(app); integrationRoutes(app); saasRoutes(app); reportRoutes(app); formRoutes(app); financeRoutes(app); amendmentRoutes(app); interpreterRoutes(app); recordRoutes(app); realtimeRoutes(app); pipelineRoutes(app); sequenceRoutes(app); recallRoutes(app); clinicalRoutes(app);
+  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app); inboxRoutes(app); integrationRoutes(app); saasRoutes(app); reportRoutes(app); formRoutes(app); financeRoutes(app); amendmentRoutes(app); interpreterRoutes(app); recordRoutes(app); realtimeRoutes(app); pipelineRoutes(app); sequenceRoutes(app); recallRoutes(app); clinicalRoutes(app); aiRoutes(app);
 }
