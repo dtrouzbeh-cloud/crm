@@ -1,6 +1,6 @@
-# DentaFlow — Proje Tanımı (v0.1 taslak)
+# DentaFlow — Proje Tanımı (v0.2)
 
-> **Durum:** Kurgu aşaması. Bu doküman onaylandıktan sonra sistem sıfırdan kurulacak.
+> **Durum:** Onaylandı — geliştirme başladı (F0).
 > **Kararlar (5 Ekim 2026):**
 > - Çok kiracılı SaaS
 > - Yalnızca diş turizmi
@@ -12,6 +12,22 @@
 > - Prototip: https://rouzbeh.app/crm/
 
 ---
+
+## 0. Kesinleşen kararlar (v0.2 — 5 Ekim 2026)
+
+| Konu | Karar |
+|---|---|
+| Ad | Çalışma adı **DentaFlow** (değiştirilebilir) |
+| SaaS fiyatı | **Hibrit:** klinik başına sabit paket + kullanıcı (koltuk) başına ücret |
+| Hasta ödemeleri | **Tüm seçenekler:** kart (Stripe, iyzico), PayPal, Apple/Google Pay (Stripe üzerinden), SEPA/banka havalesi (IBAN + referans kodu), ödeme linki, klinikte nakit/POS. Sağlayıcı katmanı eklentili (adapter) |
+| WhatsApp | **WhatsApp Business Platform (Cloud API)** + **Business App coexistence** (klinik WhatsApp Business uygulamasını kullanmaya devam ederken aynı numara CRM'e bağlanır; Meta Embedded Signup). Resmî olmayan QR/Web oturumu yöntemleri numara engellenme riski nedeniyle kullanılmaz |
+| Mesaj ücretleri | Klinik kendi Meta işletme hesabıyla doğrudan öder; platform aracı olmaz |
+| Barındırma | Başlangıçta mevcut VPS (Türkiye). **Bölge bağımsız** tasarım: tek komutla AB/ABD sunucusuna taşınabilir (12-factor yapılandırma, S3 uyumlu depolama arayüzü, tam yedek/geri yükleme) |
+| Kapsam | Analiz edilen sistemdeki **tüm özellikler** bu sürümde yer alır (fazlara bölünmüş olarak) |
+| Veri akışı | **Entegrasyon merkezi:** gelen webhook alıcıları (genel JSON eşlemeli), giden webhook'lar (olay aboneliği), REST API + API anahtarları, CSV/Excel içe aktarma, Zapier/Make uyumlu olay kataloğu, hazır bağlayıcılar (Meta, TikTok, Google, GoHighLevel, Zoho, HubSpot) |
+| Geliştirme | Tamamen bu ortamda yürütülür; iş GitHub (`dtrouzbeh-cloud/crm`) üzerinden fazlar halinde ilerler |
+| Altyapı sadeleştirmesi | Docker kullanılmaz. Node 24 (TypeScript doğrudan çalışır, derleme adımı yok) + systemd + sunucudaki PostgreSQL 17 + mevcut nginx |
+| Geçici alan adı | `crm.188-132-215-179.sslip.io` (gerçek alan adı alınınca değişecek) |
 
 ## 1. Ürün vizyonu ve ilkeler
 
@@ -297,13 +313,13 @@ Az araç, tek dil ve tek veritabanı hedeflenir.
 | Katman | Seçim | Neden |
 |---|---|---|
 | Dil | TypeScript (her yerde) | Tek dil, paylaşılan tipler |
-| Monorepo | pnpm workspaces | `apps/api`, `apps/web`, `packages/core` (kural motoru, fiyat hesabı, şema bileşeni, zod şemaları) |
+| Monorepo | npm workspaces | `apps/api`, `apps/web`, `packages/core` (kural motoru, fiyat hesabı, şema bileşeni, zod şemaları) |
 | Backend | Node 22 + **Fastify** | Hızlı, sade, şema tabanlı doğrulama |
-| ORM / SQL | **Drizzle** + SQL migration | Tipli, hafif, ham SQL'e yakın |
+| SQL | **postgres.js** + düz SQL migration dosyaları | ORM yok; en hızlı sürücü, tam SQL kontrolü |
 | Veritabanı | **PostgreSQL 16** | RLS, JSONB snapshot, tam metin arama (hasta arama) |
-| Kuyruk / zamanlayıcı | **pg-boss** (PostgreSQL üzerinde) | Redis gerekmez; webhook işleme, hatırlatma, mutabakat, PDF |
+| Kuyruk / zamanlayıcı | PostgreSQL `jobs` tablosu + `SKIP LOCKED` (kendi küçük işçimiz) | Redis gerekmez; webhook işleme, hatırlatma, mutabakat, PDF |
 | Gerçek zamanlı | SSE + PostgreSQL `LISTEN/NOTIFY` | Ek servis gerekmez; inbox ve bildirimler |
-| Frontend | React 19 + Vite + TanStack Router/Query | Prototipteki ekranlar bileşenlere taşınır |
+| Frontend | React 19 + Vite + TanStack Query + wouter (küçük router) | Prototipteki ekranlar bileşenlere taşınır |
 | Stil | Prototipteki CSS token sistemi (Tailwind yok) | Az bağımlılık, küçük paket |
 | Şema bileşeni | Prototipteki parametrik SVG → `packages/core` | Klinikte, teklifte, PDF'te aynı çizim |
 | i18n | Sözlük + ICU mesajları | TR, EN, DE, AR (RTL), FR, ES, RU, IT, NL… |
@@ -315,9 +331,9 @@ Az araç, tek dil ve tek veritabanı hedeflenir.
 | Gözlem | Yapılandırılmış log (pino) + Sentry (opsiyonel) + uptime kontrolü | |
 
 ### 7.2 Dağıtım (mevcut VPS)
-- **Docker Compose:** `api` (statik frontend'i de sunar), `worker`, `postgres`, `pdf`. Mevcut **nginx** ters vekil olarak kalır, SSL Let's Encrypt ile.
+- **systemd servisleri:** `dentaflow-api` (statik frontend'i de sunar) ve `dentaflow-worker`. Sunucudaki PostgreSQL 17 (ayrı veritabanı + RLS rolü), mevcut **nginx** ters vekil, SSL Let's Encrypt ile.
 - **Alan adları:** `app.<alan>` (uygulama), `p.<alan>` (hasta sayfaları), `api.<alan>` (webhook'lar). Alan adı kararı bekliyor.
-- **CI/CD:** GitHub Actions → test → Docker imajı → sunucuya SSH ile dağıtım (sıfır kesinti: yeni konteyner, sağlık kontrolü, trafik geçişi).
+- **CI/CD:** GitHub Actions → typecheck + test → sunucuya SSH ile dağıtım (`git pull`, `npm ci`, migration, web build, servis yeniden başlatma).
 - **Yedek:**
   - Gece `pg_dump` + dosyalar → offsite, 30 gün saklama.
   - Haftalık geri yükleme testi.

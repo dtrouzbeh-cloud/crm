@@ -1,0 +1,28 @@
+{
+  "name": "dentaflow",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:api": "node --watch --env-file-if-exists=.env apps/api/src/server.ts",
+    "dev:web": "npm run dev -w @dentaflow/web",
+    "migrate": "node --env-file-if-exists=.env apps/api/src/migrate.ts",
+    "worker": "node --env-file-if-exists=.env apps/api/src/worker.ts",
+    "build": "npm run build -w @dentaflow/web",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @dentaflow/web",
+    "test": "node --test --env-file-if-exists=.env 'apps/api/test/**/*.test.ts' 'packages/core/test/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^24.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
