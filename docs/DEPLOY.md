@@ -1,7 +1,7 @@
 # Dağıtım ve İşletim
 
 ## Canlı ortam
-- **URL:** https://crm.188-132-215-179.sslip.io (gerçek alan adı alınınca değişecek)
+- **URL:** https://crm.rouzbeh.app (eski adres crm.188-132-215-179.sslip.io kalıcı olarak yönlendirilir; /api/public webhookları eski adreste de çalışır)
 - **Sunucu:** VPS (Ubuntu 24.04), Node 24, PostgreSQL 17, nginx + Let's Encrypt
 - **Servisler:** `dentaflow-api` (API + web), `dentaflow-worker` (iş akışları, webhook'lar, e-posta, otomatik yanıtlar)
 - **Dizinler:** `/opt/dentaflow/app` (kod), `/opt/dentaflow/.env` (gizli ayarlar), `/opt/dentaflow/storage` (dosyalar), `/opt/dentaflow/backups` (yedekler)
