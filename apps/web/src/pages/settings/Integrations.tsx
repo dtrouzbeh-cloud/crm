@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../lib/i18n.tsx";
-import { get, post, patch, del } from "../../lib/api.ts";
+import { get, post, patch, del, put } from "../../lib/api.ts";
 import { Spinner, toast, toastErr, Switch, confirmBox, Modal } from "../../components/ui.tsx";
 import { Icon } from "../../components/Icon.tsx";
 import { ConnectCard } from "../Inbox.tsx";
+import { MetaAdsCard } from "../../components/AdsPanels.tsx";
 
 const SOURCES: [string, string, string][] = [["google_leads", "Google Ads", "🔎"], ["tiktok_leads", "TikTok Lead Gen", "🎵"], ["inbound_webhook", "Zapier / Make / Webhook", "⚡"], ["wordpress", "WordPress / Elementor", "🌐"], ["typeform", "Typeform / Jotform", "📝"], ["ghl", "GoHighLevel", "📈"], ["zoho", "Zoho CRM", "🗂"], ["hubspot", "HubSpot", "🧡"]];
 
@@ -19,11 +20,14 @@ export default function IntegrationsTab() {
   const r = (k: string) => qc.invalidateQueries({ queryKey: [k] });
   if (!ig || !keys || !wh) return <Spinner />;
   return <div className="col" style={{ gap: 14 }}>
+    <WidgetCard />
+    <MetaAdsCard />
     <div className="card"><div className="hd"><h2 className="grow">💬 {t("channels")}</h2></div><div className="bd col">
-      {accounts?.map((a) => <div key={a.id} className="row wrap"><span className="bdg ok">WhatsApp</span><b>{a.name}</b><span className="small muted">{a.phone}</span>{a.config?.coexistence && <span className="bdg info">{t("coexistence")}</span>}
+      {accounts?.filter((a) => a.channel !== "web").map((a) => <div key={a.id} className="row wrap"><span className="bdg ok">{a.channel === "whatsapp" ? "WhatsApp" : a.channel}</span><b>{a.name}</b><span className="small muted">{a.phone}</span>{a.config?.coexistence && <span className="bdg info">{t("coexistence")}</span>}
         <span className={"bdg " + (a.status === "connected" ? "ok" : "err")}>{a.status}</span><span className="tiny muted grow">{a.lastWebhookAt ? "webhook " + rel(a.lastWebhookAt) : ""}</span>
         <label className="row small" style={{ gap: 6 }}><span className="switch"><input type="checkbox" defaultChecked={!!a.config?.autoReply?.enabled} onChange={(e) => patch(`/api/inbox/accounts/${a.id}`, { config: { autoReply: { ...(a.config?.autoReply ?? {}), enabled: e.target.checked, text: a.config?.autoReply?.text || t("autoreply_default"), outsideHoursOnly: true } } }).then(() => r("wa-accounts"))} /><span /></span>{t("auto_reply")}</label></div>)}
-      {!accounts?.length && <ConnectCard />}
+      {!accounts?.some((a) => a.channel === "whatsapp") && <ConnectCard />}
+      <MetaConnect onDone={() => qc.invalidateQueries({ queryKey: ["wa-accounts"] })} />
       {accounts?.length ? <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={async () => { const x = await post("/api/inbox/templates/sync"); toast(`${x.synced} ${t("templates")}`); }}>{t("sync_templates")}</button> : null}
     </div></div>
 
@@ -60,4 +64,37 @@ export default function IntegrationsTab() {
     {secret && <Modal onClose={() => setSecret(null)}><div className="hd"><h2>{secret.title}</h2></div><div className="bd col"><div className="code" style={{ fontSize: 13, padding: 10 }}>{secret.value}</div>{secret.hint && <div className="small muted">{secret.hint}</div>}</div>
       <div className="ft"><button className="btn" onClick={() => { navigator.clipboard.writeText(secret.value); toast(t("copied")); }}><Icon n="copy" />{t("copy")}</button><button className="btn pri" onClick={() => setSecret(null)}>{t("ok")}</button></div></Modal>}
   </div>;
+}
+
+function WidgetCard() {
+  const { t } = useT(); const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["widget"], queryFn: () => get("/api/widget") });
+  if (!data) return null;
+  const save = async (b: any) => { try { await put("/api/widget", b); qc.invalidateQueries({ queryKey: ["widget"] }); toast(t("saved")); } catch (e) { toastErr(e); } };
+  return <div className="card"><div className="hd"><h2 className="grow">🌐 {t("website_channel")}</h2><span className="tiny muted">{data.stats.convs} {t("chats")} · {data.stats.leads} lead</span>
+    <Switch checked={data.status === "connected"} onChange={(v) => save({ enabled: v })} /></div><div className="bd col" style={{ gap: 10 }}>
+    <div className="small muted">{t("widget_hint")}</div>
+    <div className="row" style={{ gap: 6 }}><code className="code grow" style={{ padding: 8, overflow: "auto", whiteSpace: "nowrap" }}>{data.snippet}</code><button className="btn sm" onClick={() => { navigator.clipboard.writeText(data.snippet); toast(t("copied")); }}><Icon n="copy" /></button></div>
+    <div className="row wrap" style={{ gap: 10 }}>
+      <label className="row small" style={{ gap: 6 }}>{t("color")}<input type="color" defaultValue={data.config.color ?? "#0E7C86"} onBlur={(e) => save({ color: e.target.value })} /></label>
+      <label className="row small" style={{ gap: 6 }}>{t("position")}<select className="inp sm" style={{ width: "auto" }} value={data.config.position ?? "right"} onChange={(e) => save({ position: e.target.value })}><option value="right">→</option><option value="left">←</option></select></label>
+      <label className="row small grow" style={{ gap: 6 }}>{t("greeting")} (TR)<input className="inp sm grow" defaultValue={data.config.greeting?.tr ?? ""} onBlur={(e) => save({ greeting: { ...(data.config.greeting ?? {}), tr: e.target.value } })} /></label>
+      <label className="row small grow" style={{ gap: 6 }}>(EN)<input className="inp sm grow" defaultValue={data.config.greeting?.en ?? ""} onBlur={(e) => save({ greeting: { ...(data.config.greeting ?? {}), en: e.target.value } })} /></label></div>
+    <div className="row wrap" style={{ gap: 8 }}><span className="small">📝 {t("hosted_form")}:</span><a className="small" href={data.formUrl} target="_blank" rel="noopener">{data.formUrl}</a><button className="btn xs" onClick={() => { navigator.clipboard.writeText(data.formUrl); toast(t("copied")); }}><Icon n="copy" /></button>
+      <span className="tiny muted">{t("form_utm_hint")}</span></div>
+  </div></div>;
+}
+
+function MetaConnect({ onDone }: { onDone: () => void }) {
+  const { t } = useT(); const [open, setOpen] = useState(false); const [f, setF] = useState({ channel: "instagram", externalId: "", token: "", name: "" }); const [res, setRes] = useState<any>(null);
+  const save = async () => { try { setRes(await post("/api/inbox/accounts/meta", f)); onDone(); toast(t("saved")); } catch (e) { toastErr(e); } };
+  return <>{!open ? <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setOpen(true)}>📷 {t("connect_ig_fb")}</button> :
+    <div className="card pad col" style={{ gap: 8 }}><b className="small">📷 {t("connect_ig_fb")}</b>
+      <div className="row wrap" style={{ gap: 8 }}><select className="inp sm" style={{ width: "auto" }} value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })}><option value="instagram">Instagram</option><option value="messenger">Messenger</option></select>
+        <input className="inp sm" style={{ width: 200 }} placeholder={f.channel === "instagram" ? "Instagram account ID" : "Facebook Page ID"} value={f.externalId} onChange={(e) => setF({ ...f, externalId: e.target.value.trim() })} />
+        <input className="inp sm" style={{ width: 160 }} placeholder={t("name")} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        <input className="inp sm grow" type="password" placeholder="Page access token" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value.trim() })} />
+        <button className="btn sm pri" disabled={!f.externalId || !f.token || !f.name} onClick={save}>{t("save")}</button><button className="btn sm ghost" onClick={() => setOpen(false)}>{t("cancel")}</button></div>
+      <div className="tiny muted">{t("meta_connect_hint")}</div>
+      {res && <div className="alert ok"><span className="small">Webhook URL: <code className="code">{res.webhookUrl}</code> · {t("meta_webhook_fields")}</span></div>}</div>}</>;
 }

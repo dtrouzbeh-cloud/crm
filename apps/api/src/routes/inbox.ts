@@ -13,6 +13,14 @@ async function account(tx: Tx, id: string) {
   const [a] = await tx`select * from channel_accounts where id = ${id}`; if (!a) throw notFound("Hesap");
   return { id: a.id as string, wabaId: a.wabaId as string, externalId: a.externalId as string, config: a.config as Record<string, any>, token: a.accessTokenEnc ? decrypt(a.accessTokenEnc) : "" };
 }
+/** Instagram DM / Messenger gönderimi (Graph API, sayfa erişim anahtarı) */
+async function metaSend(a: { token: string; externalId: string }, recipient: string, text: string) {
+  if (!text) throw new HttpError(400, "text_only", "Bu kanalda yalnız metin gönderilebilir");
+  const r = await fetch(`https://graph.facebook.com/v21.0/${a.externalId}/messages?access_token=${encodeURIComponent(a.token)}`, { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ recipient: { id: recipient }, messaging_type: "RESPONSE", message: { text } }), signal: AbortSignal.timeout(20_000) });
+  const j: any = await r.json().catch(() => ({})); if (!r.ok) throw new WaError(j?.error?.message ?? `meta_${r.status}`, j?.error?.code);
+  return { messages: [{ id: j.message_id ?? null }] };
+}
 function inboxScope(tx: Tx, c: Ctx) { return c.perms["inbox.use"] === "own" ? tx`and (cv.assignee_id = ${c.userId} or cv.assignee_id is null)` : tx``; }
 
 /** Gelen mesajı işle (webhook ve testler aynı yolu kullanır) */
@@ -235,12 +243,15 @@ export function inboxRoutes(app: FastifyInstance) {
 export async function sendInConversation(c: Pick<Ctx, "clinicId" | "userId">, conversationId: string, m: { kind: "text"; body: string; idem: string } | { kind: "template"; template: { name: string; language: string; params: string[]; buttonParam?: string }; idem: string }) {
   return withClinic(c.clinicId, async (tx) => {
     const [cv] = await tx`select * from conversations where id = ${conversationId}`; if (!cv) throw notFound("Konuşma");
-    if (m.kind === "text" && !inWindow(cv.lastInboundAt)) throw new HttpError(409, "window_closed", "24 saatlik pencere kapalı — onaylı şablon gönderin");
+    // 24 saat penceresi WhatsApp/Instagram/Messenger için; web sohbetinde yok
+    if (m.kind === "text" && cv.channel !== "web" && !inWindow(cv.lastInboundAt)) throw new HttpError(409, "window_closed", "24 saatlik pencere kapalı — onaylı şablon gönderin");
     const [dup] = await tx`select id, status from messages where conversation_id = ${conversationId} and idempotency_key = ${m.idem}`; if (dup) return { id: dup.id, status: dup.status, duplicate: true };
     const a = await account(tx, cv.accountId);
     const [row] = await tx`insert into messages (clinic_id, conversation_id, direction, type, body, template, status, user_id, idempotency_key) values (${c.clinicId}, ${conversationId}, 'out', ${m.kind}, ${m.kind === "text" ? m.body : m.template.params.join(" · ")}, ${m.kind === "template" ? tx.json(m.template as never) : null}, 'queued', ${c.userId}, ${m.idem}) returning id`;
     try {
-      const r = m.kind === "text" ? await wa.sendText(a.token, a.externalId, cv.contactId, m.body) : await wa.sendTemplate(a.token, a.externalId, cv.contactId, m.template.name, m.template.language, m.template.params, m.template.buttonParam);
+      const r = cv.channel === "web" ? { messages: [{ id: null }] } // web: ziyaretçi sohbet penceresinden çeker
+        : cv.channel === "instagram" || cv.channel === "messenger" ? await metaSend(a, cv.contactId, m.kind === "text" ? m.body : "")
+        : m.kind === "text" ? await wa.sendText(a.token, a.externalId, cv.contactId, m.body) : await wa.sendTemplate(a.token, a.externalId, cv.contactId, m.template.name, m.template.language, m.template.params, m.template.buttonParam);
       await tx`update messages set status = 'sent', external_id = ${r.messages?.[0]?.id ?? null} where id = ${row!.id}`;
     } catch (e) {
       await tx`update messages set status = 'failed', error = ${(e as Error).message} where id = ${row!.id}`;

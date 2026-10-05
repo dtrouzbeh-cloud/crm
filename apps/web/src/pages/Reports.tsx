@@ -4,6 +4,7 @@ import { useT } from "../lib/i18n.tsx";
 import { get, qs } from "../lib/api.ts";
 import { PageHead, Spinner } from "../components/ui.tsx";
 import { minor } from "../lib/format.tsx";
+import { RoasReport } from "../components/AdsPanels.tsx";
 
 const pct = (a: number, b: number) => (b ? Math.round((100 * a) / b) : 0);
 export default function Reports() {
@@ -35,5 +36,6 @@ export default function Reports() {
       {data.reps.length > 0 && <div className="card"><div className="hd"><h3 className="grow">{t("team_perf")}</h3></div><div className="twrap"><table className="tbl"><thead><tr><th /><th className="r">{t("f_leads")}</th><th className="r">{t("f_won")}</th><th className="r">{t("first_response")}</th><th className="r">{t("activities")}</th></tr></thead><tbody>
         {data.reps.map((r: any) => <tr key={r.name}><td><b className="small">{r.name}</b></td><td className="r num">{r.leads}</td><td className="r num">{r.won}</td><td className="r num">{r.medianResponseMin != null ? Math.round(r.medianResponseMin) + " dk" : "—"}</td><td className="r num">{r.activities}</td></tr>)}</tbody></table></div></div>}
       {data.lost.length > 0 && <div className="card"><div className="hd"><h3 className="grow">{t("loss_reasons")}</h3></div><div className="bd col">{data.lost.map((r: any) => <div key={r.reason} className="row small"><span className="grow">{t("lr_" + r.reason) !== "lr_" + r.reason ? t("lr_" + r.reason) : r.reason}</span><b>{r.n}</b></div>)}</div></div>}
-    </div></>;
+    </div><RoasReport />
+  </>;
 }

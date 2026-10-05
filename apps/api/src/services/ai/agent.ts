@@ -200,7 +200,7 @@ export async function shouldAutoReply(clinicId: string, conversationId: string):
 
 /** İşçi: gelen WhatsApp mesajında AI işi kuyruğa al (aynı konuşmada bekleyen iş varsa ekleme — art arda mesajlar tek cevapta toplanır) */
 export async function aiHooks(ev: { clinicId: string; type: string; payload: Record<string, unknown> }) {
-  if (ev.type !== "wa.message" || !ev.payload.conversationId) return;
+  if ((ev.type !== "wa.message" && ev.type !== "chat.message") || !ev.payload.conversationId) return;
   const conv = ev.payload.conversationId as string;
   const [last] = await ownerSql`select body from messages where conversation_id = ${conv} and direction = 'in' order by id desc limit 1`;
   if (/^\s*(stop|dur|unsubscribe|abmelden)\s*[.!]*\s*$/i.test(String(last?.body ?? ""))) return;

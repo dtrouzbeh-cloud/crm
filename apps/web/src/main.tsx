@@ -37,6 +37,7 @@ const Pipelines = lazy(() => import("./pages/Pipelines.tsx"));
 const Sequences = lazy(() => import("./pages/Sequences.tsx"));
 const Clinical = lazy(() => import("./pages/Clinical.tsx"));
 const WarrantyCard = lazy(() => import("./pages/WarrantyCard.tsx"));
+const LeadForm = lazy(() => import("./pages/LeadForm.tsx"));
 
 // Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
 addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
@@ -61,6 +62,7 @@ function App() {
     <Route path="/invite/:token" component={InviteAccept} />
     <Route path="/q/:token">{() => <Suspense fallback={<Spinner />}><PatientQuote /></Suspense>}</Route>
     <Route path="/f/:token">{() => <Suspense fallback={<Spinner />}><PatientForm /></Suspense>}</Route>
+    <Route path="/l/:key">{() => <Suspense fallback={<Spinner />}><LeadForm /></Suspense>}</Route>
     <Route path="/w/:token">{() => <Suspense fallback={<Spinner />}><WarrantyCard /></Suspense>}</Route>
     <Route path="/a/:token">{() => <Suspense fallback={<Spinner />}><PatientAmendment /></Suspense>}</Route>
     <Route>{() => <Authed><Switch>

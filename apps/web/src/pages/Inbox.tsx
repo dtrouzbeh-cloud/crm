@@ -8,6 +8,7 @@ import { PageHead, Spinner, Empty, Avatar, toast, toastErr, Modal } from "../com
 import { Icon } from "../components/Icon.tsx";
 import { useCan, useMe } from "../lib/auth.ts";
 import { StageBadge } from "../lib/format.tsx";
+const CH_IC: Record<string, string> = { whatsapp: "🟢", web: "🌐", instagram: "📷", messenger: "💬" };
 
 const FILTERS = ["all", "mine", "unassigned", "starred", "closed"];
 export default function Inbox() {
@@ -22,7 +23,7 @@ export default function Inbox() {
         <div style={{ padding: 10, borderBottom: "1px solid var(--line)" }} className="col"><input className="inp sm" placeholder={t("filter_ph")} value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="row wrap" style={{ gap: 4 }}>{FILTERS.map((f) => <button key={f} className={"chip" + (filter === f ? " on" : "")} style={{ height: 26, fontSize: 12 }} onClick={() => setFilter(f)}>{t("if_" + f)}</button>)}</div></div>
         <div style={{ overflow: "auto", flex: 1 }}>{!data ? <Spinner /> : data.length ? data.map((cv) => <a key={cv.id} onClick={() => nav(`/inbox/${cv.id}`)} className="row" style={{ padding: "10px 12px", borderBottom: "1px solid var(--line)", cursor: "pointer", background: cv.id === id ? "var(--brand-soft)" : undefined, color: "inherit", alignItems: "flex-start" }}>
-          <Avatar name={cv.contactName ?? cv.contactId} /><div className="grow" style={{ minWidth: 0 }}><div className="row"><b className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cv.contactName ?? "+" + cv.contactId}</b><span className="tiny muted">{cv.lastMessageAt ? rel(cv.lastMessageAt) : ""}</span></div>
+          <Avatar name={cv.contactName ?? cv.contactId} /><div className="grow" style={{ minWidth: 0 }}><div className="row"><b className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{CH_IC[cv.channel] ? CH_IC[cv.channel] + " " : ""}{cv.contactName ?? (cv.channel === "whatsapp" ? "+" + cv.contactId : cv.channel)}</b><span className="tiny muted">{cv.lastMessageAt ? rel(cv.lastMessageAt) : ""}</span></div>
             <div className="row"><span className="small muted grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cv.lastPreview}</span>{cv.unread > 0 && <span className="bdg n">{cv.unread}</span>}</div>
             <div className="row tiny muted" style={{ gap: 6 }}>{cv.starred && "★"}{cv.assigneeName ? <><Avatar name={cv.assigneeName} sm /> {cv.assigneeName.split(" ")[0]}</> : <span className="bdg warn">{t("if_unassigned")}</span>}{cv.leadStage && <StageBadge s={cv.leadStage} />}</div></div></a>)
           : <Empty icon="inbox" text={t("no_convs")} />}</div>
@@ -46,7 +47,7 @@ function Chat({ id }: { id: string }) {
     try { if (mode === "note") await post(`/api/inbox/conversations/${id}/note`, { body: text }); else await post(`/api/inbox/conversations/${id}/messages`, { body: text, idempotencyKey: crypto.randomUUID() }); setText(""); refresh(); } catch (e) { toastErr(e); } finally { setSending(false); } };
   const upd = async (b: any) => { await patch(`/api/inbox/conversations/${id}`, b); refresh(); };
   return <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-    <div className="row wrap" style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)", gap: 8 }}><Avatar name={cv.contactName ?? cv.contactId} /><div className="grow"><b>{cv.contactName ?? "+" + cv.contactId}</b><div className="tiny muted">+{cv.contactId} · {cv.accountName}</div></div>
+    <div className="row wrap" style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)", gap: 8 }}><Avatar name={cv.contactName ?? cv.contactId} /><div className="grow"><b>{cv.contactName ?? (cv.channel === "whatsapp" ? "+" + cv.contactId : cv.channel)}</b><div className="tiny muted">{CH_IC[cv.channel] ?? ""} {cv.channel === "whatsapp" ? "+" + cv.contactId + " · " : ""}{cv.accountName}</div></div>
       {cv.leadId && <Link className="btn sm" href={`/leads/${cv.leadId}`}><Icon n="users" />{t("open_lead")}</Link>}
       <select className="inp sm" style={{ width: "auto" }} value={cv.assigneeId ?? ""} onChange={(e) => upd({ assigneeId: e.target.value || null })}><option value="">{t("if_unassigned")}</option>{team?.members?.filter((m: any) => m.active).map((m: any) => <option key={m.userId} value={m.userId}>{m.name}</option>)}</select>
       <button className="btn sm icon" title="★" onClick={() => upd({ starred: !cv.starred })} style={cv.starred ? { color: "var(--accent)" } : undefined}><Icon n="star" /></button>

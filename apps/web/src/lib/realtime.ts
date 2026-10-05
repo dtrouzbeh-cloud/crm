@@ -10,7 +10,7 @@ const MAP: [RegExp, string[][]][] = [
   [/^case\./, [["cases"], ["dashboard"]]],
   [/^quote\./, [["quotes"], ["quote"], ["cases"], ["lead"], ["dashboard"]]],
   [/^(deal|payment)\./, [["deals"], ["deal"], ["fin-summary"], ["commissions"], ["my-commissions"]]],
-  [/^wa\.|^message\./, [["convs"], ["conv"], ["inboxunread"]]],
+  [/^wa\.|^message\.|^chat\.|^ai\./, [["convs"], ["conv"], ["inboxunread"], ["conv-ai"]]],
   [/^task\./, [["tasks"], ["taskcounts"]]],
   [/^form\./, [["forms"], ["lead"]]],
   [/^visit\./, [["deals"], ["interp"]]],

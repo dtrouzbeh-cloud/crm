@@ -38,7 +38,7 @@ async function quoteLink(tx: Tx, leadId: string) {
   return q ? `${config.appUrl}/q/${decrypt(q.tokenEnc as string)}` : "";
 }
 
-export const STOP_EVENTS: Record<string, string> = { "wa.message": "replied", "quote.viewed": "quote_viewed", "quote.accepted": "quote_accepted", "deal.created": "deal_created", "form.completed": "form_completed", "payment.succeeded": "paid", "consent.revoked": "opted_out" };
+export const STOP_EVENTS: Record<string, string> = { "wa.message": "replied", "chat.message": "replied", "quote.viewed": "quote_viewed", "quote.accepted": "quote_accepted", "deal.created": "deal_created", "form.completed": "form_completed", "payment.succeeded": "paid", "consent.revoked": "opted_out" };
 
 export async function enroll(tx: Tx, clinicId: string, sequenceId: string, leadId: string, userId: string | null = null) {
   const [s] = await tx`select id, active from sequences where id = ${sequenceId} and clinic_id = ${clinicId}`; if (!s) return null;
