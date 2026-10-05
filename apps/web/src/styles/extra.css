@@ -1,0 +1,21 @@
+/* Uygulamaya özgü ekler */
+.page{animation:none}
+.tbl td .muted{font-size:12px}
+.pager{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid var(--line)}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.stack>*+*{margin-top:12px}
+.sticky-foot{position:sticky;bottom:0;background:var(--bg);padding:10px 0;z-index:5}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--subtle);padding:2px 6px;border-radius:6px;word-break:break-all}
+@media (max-width:640px){.chartbox{overflow-x:auto}.chartbox .cw{min-width:600px}#langSel{max-width:96px}.search{min-width:44px}.kv{grid-template-columns:1fr}}
+@media (max-width:1180px){.ws2{grid-template-columns:1fr!important}.ws2>div:last-child{position:static!important}}
+@media print{
+  #root{display:block!important}
+  body *{visibility:hidden}
+  #printable,#printable *{visibility:visible}
+  #printable{position:absolute!important;left:0!important;top:0!important;width:100%;background:#fff!important;padding:0!important;max-height:none!important;overflow:visible!important;border-radius:0}
+  #printable .doc{box-shadow:none;width:auto;padding:0;margin:0}
+  #printable .doc h2{break-after:avoid} #printable .doc .pb{break-before:page}
+  #printable table,#printable .chartwrap,#printable .opt{break-inside:avoid}
+  @page{size:A4;margin:14mm 14mm 16mm}
+}

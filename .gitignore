@@ -6,3 +6,4 @@ dist/
 !.env.example
 storage/
 *.log
+.claude/settings.local.json
