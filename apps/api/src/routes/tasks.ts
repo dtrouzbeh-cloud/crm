@@ -1,3 +1,4 @@
+import { notifyUser } from "../services/notify.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
@@ -41,7 +42,7 @@ export function taskRoutes(app: FastifyInstance) {
     return withClinic(c.clinicId, async (tx) => {
       const [t] = await tx`insert into tasks (clinic_id, title, description, type, priority, due_at, lead_id, assignee_id, created_by, entity, entity_id)
         values (${c.clinicId}, ${b.title}, ${b.description ?? null}, ${b.type}, ${b.priority}, ${b.dueAt}, ${b.leadId ?? null}, ${b.assigneeId ?? c.userId}, ${c.userId}, ${b.entity ?? null}, ${b.entityId ?? null}) returning id`;
-      if (b.assigneeId && b.assigneeId !== c.userId) await tx`insert into notifications (clinic_id, user_id, type, title, link) values (${c.clinicId}, ${b.assigneeId}, 'task.assigned', ${b.title}, '/tasks')`;
+      if (b.assigneeId && b.assigneeId !== c.userId) { const uid = b.assigneeId; setImmediate(() => notifyUser(c.clinicId, uid, "task.assigned", b.title, "/tasks").catch(() => {})); }
       return t;
     });
   });

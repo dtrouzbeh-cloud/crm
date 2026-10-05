@@ -5,6 +5,7 @@ import { Icon } from "./Icon.tsx";
 import { Avatar } from "./ui.tsx";
 import { useT } from "../lib/i18n.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
+import { useRealtime } from "../lib/realtime.ts";
 import { get, post, qs } from "../lib/api.ts";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import { StageBadge, flag } from "../lib/format.tsx";
@@ -21,12 +22,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { data: tc } = useQuery({ queryKey: ["taskcounts"], queryFn: () => get("/api/tasks/counts"), refetchInterval: 60_000 });
   const { data: cc } = useQuery({ queryKey: ["casecounts"], queryFn: () => get("/api/cases?limit=1"), enabled: can("case.read"), refetchInterval: 120_000 });
-  const { data: ib } = useQuery({ queryKey: ["inboxunread"], queryFn: () => get("/api/inbox/unread"), enabled: can("inbox.use"), refetchInterval: 20_000 });
+  const { data: ib } = useQuery({ queryKey: ["inboxunread"], queryFn: () => get("/api/inbox/unread"), enabled: can("inbox.use"), refetchInterval: 120_000 });
   const { data: bill } = useQuery({ queryKey: ["billing"], queryFn: () => get("/api/billing"), staleTime: 10 * 60_000 });
   const [theme, setTheme] = useState(() => localStorage.getItem("df_theme") || "auto");
   useEffect(() => { const r = document.documentElement; if (theme === "auto") delete r.dataset.theme; else r.dataset.theme = theme; localStorage.setItem("df_theme", theme); }, [theme]);
   useEffect(() => { if (me?.clinic?.brandColor) { const r = document.documentElement; r.style.setProperty("--brand", me.clinic.brandColor); r.style.setProperty("--brand-soft", `color-mix(in srgb, ${me.clinic.brandColor} 13%, var(--card))`); } }, [me?.clinic?.brandColor]);
   useEffect(() => setOpen(false), [loc]);
+  useRealtime(nav);
 
   const NAV: NavItem[] = [
     { sec: "sec_work" }, { id: "dash", ic: "dash", to: "/" }, { id: "tasks", ic: "tasks", to: "/tasks", badge: tc?.today }, { id: "inbox", ic: "inbox", to: "/inbox", perm: "inbox.use", badge: ib?.n },
@@ -78,7 +80,7 @@ function GlobalSearch() {
 
 function Notifications() {
   const { t, rel } = useT(); const [open, setOpen] = useState(false); const qc = useQueryClient(); const [, nav] = useLocation();
-  const { data } = useQuery({ queryKey: ["notifs"], queryFn: () => get("/api/notifications"), refetchInterval: 30_000 });
+  const { data } = useQuery({ queryKey: ["notifs"], queryFn: () => get("/api/notifications"), refetchInterval: 180_000 });
   const readAll = async () => { await post("/api/notifications/read"); qc.invalidateQueries({ queryKey: ["notifs"] }); };
   return <div style={{ position: "relative" }}>
     <button className="btn ghost icon" onClick={() => setOpen(!open)} aria-label={t("notifications")}><Icon n="bell" />{data?.unread ? <span className="bdg n" style={{ position: "absolute", top: 2, insetInlineEnd: 0, height: 16, fontSize: 10, minWidth: 16 }}>{data.unread}</span> : null}</button>
