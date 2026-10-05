@@ -53,6 +53,7 @@ export default function StepReview({ data, cat, reload }: { data: any; cat: Cata
         <div className="grid g2">
           <a className="btn" style={{ color: "#16A34A" }} target="_blank" rel="noopener" href={`https://wa.me/${phone}?text=${encodeURIComponent(shareText(last, last.url, "wa"))}`} onClick={() => shared("whatsapp")}><Icon n="wa" />WhatsApp</a>
           <button className="btn" onClick={async () => { try { await post(`/api/quotes/${last.id}/email`, {}); toast(t("sent_ok")); } catch { location.href = `mailto:${data.patient?.email ?? ""}?subject=${encodeURIComponent(translate(last.snapshot.lang, "mail_subj", { clinic: last.snapshot.clinic.name }))}&body=${encodeURIComponent(shareText(last, last.url, "mail"))}`; shared("email"); } }}><Icon n="mail" />E-mail</button>
+          <a className="btn" href={last.url + "/hkp"} target="_blank" rel="noopener" title="Heil- und Kostenplan (DE)">🇩🇪 HKP</a>
           <button className="btn" onClick={() => { shared("pdf"); printDoc(); }}><Icon n="print" />PDF</button>
           <a className="btn" href={last.url + "?preview=1"} target="_blank" rel="noopener"><Icon n="eye" />{t("preview")}</a></div>
         <div className="tiny muted">{t("preview_no_count")} · {t("viewed")}: {last.viewedAt ? rel(last.viewedAt) + ` (${last.viewCount}×)` : "—"} · {t("valid_until")}: {date(last.validUntil)}</div>

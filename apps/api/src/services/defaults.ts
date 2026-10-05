@@ -5,7 +5,7 @@ export function defaultClinicSettings() {
     discountLimits: { admin: 100, manager: 15, sales: 5, coordinator: 5, reception: 0, dentist: 0, translator: 0, accounting: 0 },
     lossReasons: ["ghosted", "after_photos", "after_offer", "price", "other_clinic", "health", "timing", "other"],
     channels: ["whatsapp", "call", "email", "sms", "telegram"],
-    leadSources: ["meta", "google", "tiktok", "instagram", "website", "referral", "walkin", "whatsapp", "agency", "manual"],
+    leadSources: ["meta", "google", "tiktok", "instagram", "website", "landing", "form", "referral", "walkin", "whatsapp", "agency", "manual"],
     responseSlaMinutes: 15,
     assignment: { mode: "round_robin", byLanguage: true },
     caseRequired: { photos: true, xray: false, medical: true, issue: true },

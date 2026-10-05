@@ -39,6 +39,9 @@ const Clinical = lazy(() => import("./pages/Clinical.tsx"));
 const WarrantyCard = lazy(() => import("./pages/WarrantyCard.tsx"));
 const LeadForm = lazy(() => import("./pages/LeadForm.tsx"));
 const Campaigns = lazy(() => import("./pages/Campaigns.tsx"));
+const Landing = lazy(() => import("./pages/Landing.tsx"));
+const Kostenplan = lazy(() => import("./pages/Kostenplan.tsx"));
+const LandingPage = lazy(() => import("./pages/LandingPage.tsx"));
 
 // Dağıtım sonrası eski sekmede silinmiş bir parça istenirse sayfayı bir kez yenile
 addEventListener("vite:preloadError", () => { if (!sessionStorage.getItem("df_reloaded")) { sessionStorage.setItem("df_reloaded", "1"); location.reload(); } });
@@ -61,8 +64,10 @@ function App() {
     <Route path="/forgot" component={Forgot} />
     <Route path="/reset" component={Reset} />
     <Route path="/invite/:token" component={InviteAccept} />
+    <Route path="/q/:token/hkp">{() => <Suspense fallback={<Spinner />}><Kostenplan /></Suspense>}</Route>
     <Route path="/q/:token">{() => <Suspense fallback={<Spinner />}><PatientQuote /></Suspense>}</Route>
     <Route path="/f/:token">{() => <Suspense fallback={<Spinner />}><PatientForm /></Suspense>}</Route>
+    <Route path="/p/:clinic/:slug">{() => <Suspense fallback={<Spinner />}><LandingPage /></Suspense>}</Route>
     <Route path="/l/:key">{() => <Suspense fallback={<Spinner />}><LeadForm /></Suspense>}</Route>
     <Route path="/w/:token">{() => <Suspense fallback={<Spinner />}><WarrantyCard /></Suspense>}</Route>
     <Route path="/a/:token">{() => <Suspense fallback={<Spinner />}><PatientAmendment /></Suspense>}</Route>
@@ -90,6 +95,7 @@ function App() {
       <Route path="/sequences/:id?" component={Sequences} />
       <Route path="/clinical/:tab?" component={Clinical} />
       <Route path="/campaigns/:id?" component={Campaigns} />
+      <Route path="/landing/:id?" component={Landing} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;

@@ -40,7 +40,7 @@ function QuoteDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     footer={q && <><Link href={`/cases/${q.caseId}/send`} className="btn">{t("case")} →</Link><span className="grow" />
       {can("quote.send") && ["sent", "viewed", "changes"].includes(q.status) && <button className="btn danger" onClick={async () => { if (await confirmBox(t("revoke"), "", t("revoke"), true)) { await post(`/api/quotes/${id}/revoke`); refresh(); } }}>{t("revoke")}</button>}
       {can("quote.send") && <button className="btn" onClick={async () => { await post(`/api/quotes/${id}/extend`, { days: 7 }); refresh(); toast(t("saved")); }}>{t("extend")} +7</button>}
-      <button className="btn" onClick={printDoc}><Icon n="print" />PDF</button>{q.url && <a className="btn pri" href={q.url + "?preview=1"} target="_blank" rel="noopener"><Icon n="eye" />{t("view_patient_page")}</a>}</>}>
+      <button className="btn" onClick={printDoc}><Icon n="print" />PDF</button>{q.url && <a className="btn" href={q.url + "/hkp"} target="_blank" rel="noopener" title="Heil- und Kostenplan (DE)">🇩🇪 HKP</a>}{q.url && <a className="btn pri" href={q.url + "?preview=1"} target="_blank" rel="noopener"><Icon n="eye" />{t("view_patient_page")}</a>}</>}>
     {!q ? <Spinner /> : <div className="grid ws2" style={{ gridTemplateColumns: "minmax(0,1fr) 260px", alignItems: "start", gap: 14 }}>
       <div className="docwrap" id="printable"><QuoteDoc d={snapshotToDoc(q)} cat={catalogFromSnapshot(q.snapshot)} print /></div>
       <div className="col noprint" style={{ gap: 10 }}><div className="row"><QuoteBadge s={q.status} /></div>

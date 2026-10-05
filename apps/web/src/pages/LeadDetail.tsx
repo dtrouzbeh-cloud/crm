@@ -12,7 +12,7 @@ import { eventText } from "./Dashboard.tsx";
 import { TaskRow, NewTaskDrawer } from "./Tasks.tsx";
 import { FormsCard } from "../components/FormsCard.tsx";
 import { CustomFieldsCard } from "./settings/Fields.tsx";
-import { SequencesCard, ConsentCard, AiSummaryCard } from "../components/LeadAutomation.tsx";
+import { SequencesCard, ConsentCard, AiSummaryCard, ReferralCard } from "../components/LeadAutomation.tsx";
 import { LeadRecallsCard } from "../components/Recalls.tsx";
 import { ComplaintsCard } from "../components/ClinicalPanels.tsx";
 
@@ -83,6 +83,7 @@ export default function LeadDetail() {
         <SequencesCard leadId={id} />
         <LeadRecallsCard leadId={id} />
         <ComplaintsCard leadId={id} />
+        <ReferralCard leadId={id} phone={l.phone} name={l.fullName} />
         <ConsentCard leadId={id} />
         {data.otherLeads.length > 0 && <div className="card"><div className="hd"><h3 className="grow">{t("other_leads")}</h3></div><div className="bd col">{data.otherLeads.map((o: any) => <Link key={o.id} href={`/leads/${o.id}`} className="row" style={{ color: "inherit" }}>#{o.number}<span className="grow tiny muted">{date(o.createdAt)}</span><StageBadge s={o.stage} /></Link>)}</div></div>}
         {can("lead.delete") && <div className="row"><button className="btn sm ghost" onClick={() => save({ archived: !l.archivedAt })}>{l.archivedAt ? t("unarchive") : t("archive")}</button><span className="grow" />

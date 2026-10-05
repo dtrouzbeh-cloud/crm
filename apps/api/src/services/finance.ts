@@ -19,6 +19,14 @@ export async function accrueCommissions(tx: Tx, clinicId: string, paymentId: str
     return n;
   }
   if (amount <= 0) return 0;
+  // hasta tavsiyesi: sabit ödül, deal başına bir kez (ilk tahsilatta), kural gerekmez
+  if (p.partnerId) {
+    const [pt] = await tx`select id, type, reward_minor, reward_currency, active from partners where id = ${p.partnerId}`;
+    if (pt?.active && pt.rewardMinor && (!pt.rewardCurrency || pt.rewardCurrency === p.currency)) {
+      const [had] = await tx`select 1 from commissions where partner_id = ${pt.id} and deal_id = ${p.dealId} and rule_id is null limit 1`;
+      if (!had) { await tx`insert into commissions (clinic_id, rule_id, deal_id, payment_id, partner_id, base_minor, rate_bps, amount_minor, currency) values (${clinicId}, null, ${p.dealId}, ${paymentId}, ${pt.id}, ${amount}, 0, ${pt.rewardMinor}, ${p.currency})`; n++; }
+    }
+  }
   const rules = await tx`select * from commission_rules where clinic_id = ${clinicId} and active`;
   for (const r of rules) {
     if (r.source && r.source !== p.source) continue;

@@ -6,6 +6,7 @@ import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx 
 import { audit } from "../services/audit.ts";
 import { invoiceTotals, nextInvoiceNumber, linesFromDeal, type InvLine } from "../services/finance.ts";
 import { randomToken } from "../lib/crypto.ts";
+import { config } from "../config.ts";
 
 const finView = (c: Ctx) => { if (!c.perms["finance.view"] && !c.perms["finance.manage"]) throw forbidden("finance.view"); return c; };
 const invView = (c: Ctx) => { if (!c.perms["finance.view"] && !c.perms["payment.record"]) throw forbidden("finance.view"); return c; };
@@ -303,5 +304,33 @@ export function financeRoutes(app: FastifyInstance) {
     await withClinic(c.clinicId, (tx) => audit(tx, c, "finance.export", what, null, { from, to, n: rows.length }));
     reply.header("Content-Type", "text/csv; charset=utf-8").header("Content-Disposition", `attachment; filename="${what}-${from}-${to}.csv"`);
     return csv(rows as unknown as Record<string, unknown>[]);
+  });
+}
+
+// ── Hasta tavsiye programı ──
+export function referralRoutes(app: FastifyInstance) {
+  // hasta için tavsiye kodu (yoksa oluştur) + paylaşım bağlantıları + sonuçlar
+  app.post("/api/leads/:id/referral", async (req) => {
+    const c = need(ctx(req), "lead.write"); const { id } = req.params as { id: string };
+    return withClinic(c.clinicId, async (tx) => {
+      const [l] = await tx`select l.patient_id, p.full_name, p.email, p.phone from leads l join patients p on p.id = l.patient_id where l.id = ${id}`; if (!l) throw notFound("Lead");
+      const [cl] = await tx`select settings, default_currency from clinics where id = ${c.clinicId}`; const rs = ((cl!.settings as any)?.referral ?? {}) as { rewardMinor?: number; currency?: string };
+      let [pt] = await tx`select * from partners where patient_id = ${l.patientId}`;
+      if (!pt) {
+        const base = String(l.fullName).split(" ")[0]!.toUpperCase().normalize("NFKD").replace(/[^A-Z]/g, "").slice(0, 8) || "FRIEND"; let code = base + Math.floor(10 + Math.random() * 89);
+        while ((await tx`select 1 from partners where ref_code = ${code}`).length) code = base + Math.floor(100 + Math.random() * 899);
+        [pt] = await tx`insert into partners (clinic_id, name, type, email, phone, ref_code, patient_id, reward_minor, reward_currency) values (${c.clinicId}, ${l.fullName}, 'referrer', ${l.email}, ${l.phone}, ${code}, ${l.patientId}, ${rs.rewardMinor ?? null}, ${rs.currency ?? cl!.defaultCurrency}) returning *`;
+        await audit(tx, c, "referral.create", "lead", id, { code });
+      }
+      const [w] = await tx`select external_id from channel_accounts where channel = 'web' and status = 'connected' limit 1`;
+      const [stats] = await tx`select count(*)::int as leads, count(*) filter (where exists (select 1 from deals d where d.lead_id = x.id))::int as patients from leads x where x.partner_id = ${pt!.id}`;
+      const [rw] = await tx`select coalesce(sum(amount_minor) filter (where status in ('pending','approved')), 0)::bigint as due, coalesce(sum(amount_minor) filter (where status = 'paid'), 0)::bigint as paid from commissions where partner_id = ${pt!.id}`;
+      const formUrl = w ? `${config.appUrl}/l/${w.externalId}?ref=${pt!.refCode}` : null;
+      return { code: pt!.refCode, partnerId: pt!.id, rewardMinor: pt!.rewardMinor, currency: pt!.rewardCurrency, formUrl, stats, rewards: rw };
+    });
+  });
+  app.put("/api/referral-settings", async (req) => {
+    const c = need(ctx(req), "settings.manage"); const b = parse(z.object({ rewardMinor: z.number().int().min(0).nullable(), currency: z.string().length(3), friendText: z.string().max(300).optional() }), req.body);
+    return withClinic(c.clinicId, async (tx) => { await tx`update clinics set settings = jsonb_set(settings, '{referral}', ${tx.json(b as never)}) where id = ${c.clinicId}`; return { ok: true }; });
   });
 }

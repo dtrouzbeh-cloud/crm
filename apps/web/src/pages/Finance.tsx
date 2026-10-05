@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../lib/i18n.tsx";
-import { get, post, patch, del, qs } from "../lib/api.ts";
+import { get, post, patch, del, qs, put } from "../lib/api.ts";
 import { PageHead, Spinner, toast, toastErr, confirmBox, Drawer, Empty, Switch } from "../components/ui.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { useCan, useMe, useInvalidateMe } from "../lib/auth.ts";
@@ -210,6 +210,7 @@ function Partners() {
     if (edit.id) await patch(`/api/partners/${edit.id}`, b); else await post("/api/partners", b); setEdit(null); qc.invalidateQueries({ queryKey: ["partners"] }); toast(t("saved")); } catch (e) { toastErr(e); } };
   return <div className="card"><div className="hd"><h3 className="grow">{t("partners")}</h3>{can("finance.manage") && <button className="btn sm pri" onClick={() => setEdit({ type: "agency", rate: 10, active: true })}><Icon n="plus" />{t("new")}</button>}</div>
     <div className="bd tiny muted" style={{ paddingTop: 0 }}>{t("partners_hint")}</div>
+    <ReferralSettings />
     {!data ? <Spinner /> : !data.length ? <Empty icon="users" text={t("no_records")} /> : <div className="twrap"><table className="tbl"><thead><tr><th>{t("name")}</th><th>{t("type")}</th><th>{t("ref_code")}</th><th className="r">%</th><th className="r">Lead</th><th className="r">Deal</th><th className="r">{t("cs_pending")}</th><th className="r">{t("cs_paid")}</th></tr></thead><tbody>
       {data.map((p) => <tr key={p.id} className="click" style={{ opacity: p.active ? 1 : 0.5 }} onClick={() => can("finance.manage") && setEdit({ ...p, rate: p.commissionBps / 100 })}><td><b>{p.name}</b><div className="tiny faint">{p.email ?? ""}</div></td>
         <td className="small">{t("pt_" + p.type)}</td><td><span className="code">{p.refCode}</span></td><td className="r num">{(p.commissionBps ?? 0) / 100}</td><td className="r num">{p.leads}</td><td className="r num">{p.deals}</td>
@@ -228,4 +229,15 @@ function Partners() {
         {edit.refCode && <div className="tiny muted" style={{ gridColumn: "1/-1" }}>{t("ref_hint")} <span className="code">?ref={edit.refCode}</span></div>}
       </div></Drawer>}
   </div>;
+}
+
+function ReferralSettings() {
+  const { t } = useT(); const can = useCan(); const { data: me } = useMe(); const inv = useInvalidateMe();
+  const cur = ((me?.clinic as any)?.settings?.referral ?? {}) as any;
+  if (!can("settings.manage")) return null;
+  const save = async (amount: string, currency: string) => { try { await put("/api/referral-settings", { rewardMinor: amount ? Math.round(Number(amount) * 100) : null, currency }); inv(); toast(t("saved")); } catch (e) { toastErr(e); } };
+  return <div className="bd row wrap" style={{ gap: 8, paddingTop: 0 }}><span className="small">🎁 {t("referral_reward_setting")}</span>
+    <input className="inp sm num" style={{ width: 90 }} defaultValue={cur.rewardMinor ? cur.rewardMinor / 100 : ""} id="rf-amt" /><input className="inp sm" style={{ width: 64 }} defaultValue={cur.currency ?? (me?.clinic as any)?.defaultCurrency ?? "EUR"} id="rf-cur" />
+    <button className="btn sm" onClick={() => save((document.getElementById("rf-amt") as HTMLInputElement).value, (document.getElementById("rf-cur") as HTMLInputElement).value.toUpperCase())}>{t("save")}</button>
+    <span className="tiny muted">{t("referral_reward_hint")}</span></div>;
 }

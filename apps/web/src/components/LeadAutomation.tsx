@@ -50,3 +50,17 @@ export function AiSummaryCard({ leadId }: { leadId: string }) {
   return <div className="card"><div className="hd"><h2 className="grow">✨ {t("ai_summary")}</h2><button className="btn sm" disabled={busy} onClick={async () => { setBusy(true); try { setSum((await post(`/api/leads/${leadId}/ai-summary`, {})).summary); } catch (e) { toastErr(e); } finally { setBusy(false); } }}>{busy ? "…" : sum ? t("refresh") : t("generate")}</button></div>
     {sum && <div className="bd small" style={{ whiteSpace: "pre-wrap" }}>{sum}</div>}</div>;
 }
+
+export function ReferralCard({ leadId, phone, name }: { leadId: string; phone?: string | null; name?: string }) {
+  const { t, money } = useT(); const can = useCan(); const [r, setR] = useState<any>(null); const [busy, setBusy] = useState(false);
+  if (!can("lead.write")) return null;
+  const load = async () => { setBusy(true); try { setR(await post(`/api/leads/${leadId}/referral`, {})); } catch (e) { toastErr(e); } finally { setBusy(false); } };
+  const share = r ? t("referral_share", { name: (name ?? "").split(" ")[0], link: r.formUrl ?? r.code }) : "";
+  return <div className="card"><div className="hd"><h2 className="grow">🎁 {t("referral")}</h2>{!r && <button className="btn sm" disabled={busy} onClick={load}>{t("referral_get")}</button>}</div>
+    {r && <div className="bd col" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: 8 }}><span className="small muted">{t("ref_code")}</span><b className="code">{r.code}</b>{r.rewardMinor ? <span className="tiny muted">· {t("reward")}: {money(Number(r.rewardMinor) / 100, r.currency)}</span> : null}</div>
+      {r.formUrl && <div className="row" style={{ gap: 6 }}><input className="inp sm" readOnly value={r.formUrl} onFocus={(e) => e.target.select()} /><button className="btn sm" onClick={() => { navigator.clipboard.writeText(r.formUrl); toast(t("copied")); }}><Icon n="copy" /></button>
+        {phone && <a className="btn sm" style={{ color: "#16A34A" }} target="_blank" rel="noopener" href={`https://wa.me/${String(phone).replace(/\D/g, "")}?text=${encodeURIComponent(share)}`}><Icon n="wa" /></a>}</div>}
+      <div className="row tiny muted" style={{ gap: 12 }}><span>👥 {r.stats.leads} {t("referred")}</span><span>🦷 {r.stats.patients} {t("patients").toLowerCase()}</span><span>💰 {money(Number(r.rewards.due) / 100, r.currency)} {t("cs_pending").toLowerCase()}</span></div>
+    </div>}</div>;
+}
