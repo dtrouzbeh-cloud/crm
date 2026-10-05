@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      APP_URL: http://localhost:4100
+      SESSION_SECRET: ci-session-secret-ci-session-secret
+      ENCRYPTION_KEY: ci-encryption-key
+      DATABASE_URL: postgres://dentaflow_app:app@localhost:5432/dentaflow
+      DATABASE_OWNER_URL: postgres://dentaflow_owner:owner@localhost:5432/dentaflow
+      STORAGE_DIR: ./storage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - name: Veritabanı rolleri
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "create role dentaflow_owner login password 'owner'" -c "create role dentaflow_app login password 'app' nobypassrls" -c "create database dentaflow owner dentaflow_owner"
+      - run: npm run migrate
+      - run: npx tsc -p tsconfig.json --noEmit
+      - run: npm run typecheck -w @dentaflow/web
+      - run: node --test --test-concurrency=1 apps/api/test/*.test.ts packages/core/test/*.test.ts
+      - run: npm run build

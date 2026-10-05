@@ -212,6 +212,7 @@ export async function inviteMember(clinicId: string, invitedBy: string, email: s
   const t = randomToken();
   await withClinic(clinicId, (tx) => tx`insert into invites (clinic_id, email, role, token_hash, invited_by, expires_at) values (${clinicId}, ${email}, ${role}, ${sha256(t)}, ${invitedBy}, now() + interval '7 days')`);
   const link = `${config.appUrl}/invite/${t}`;
-  await sendMail(email, "DentaFlow davet / invitation", link);
+  const [cl] = await ownerSql`select name from clinics where id = ${clinicId}`;
+  await sendMail(email, `${cl?.name ?? "DentaFlow"} — ekibe davet / team invitation`, `${cl?.name ?? "DentaFlow"} sizi DentaFlow'a davet etti / invited you to DentaFlow:\n\n${link}\n\n(7 gün geçerli / valid for 7 days)`, { clinicId, fromName: cl?.name });
   return link;
 }

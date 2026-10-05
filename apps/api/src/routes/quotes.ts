@@ -9,6 +9,8 @@ import { calcAll, createQuote, discountLimit, preSendChecks, newId, optName, typ
 import { getCaseOr404, planItems } from "./cases.ts";
 import { makeOption } from "@dentaflow/core/engine";
 import { decrypt } from "../lib/crypto.ts";
+import { sendMail } from "../services/mailer.ts";
+import { translate, fmtDate } from "@dentaflow/core/i18n";
 
 const option = z.object({
   id: z.string().max(40), name: z.string().max(40), custom: z.string().max(80).optional(), rec: z.boolean(), items: planItems, extras: planItems,
@@ -154,6 +156,22 @@ export function quoteRoutes(app: FastifyInstance) {
     return withClinic(c.clinicId, async (tx) => {
       await tx`update quotes set status = 'revoked', revoked_at = now() where id = ${id} and status in ('sent','viewed','changes')`;
       await audit(tx, c, "quote.revoke", "quote", id);
+      return { ok: true };
+    });
+  });
+  app.post("/api/quotes/:id/email", async (req) => {
+    const c = need(ctx(req), "quote.send");
+    const { id } = req.params as { id: string };
+    const b = parse(z.object({ to: z.email().optional(), message: z.string().max(4000).optional() }), req.body ?? {});
+    return withClinic(c.clinicId, async (tx) => {
+      const [q] = await tx`select q.*, p.email, p.full_name from quotes q join patients p on p.id = q.patient_id where q.id = ${id}`; if (!q) throw notFound("Teklif");
+      const to = b.to ?? q.email; if (!to) throw new HttpError(400, "no_email", "Hastanın e-postası yok");
+      const s = q.snapshot as any, L = q.language, url = `${config.appUrl}/q/${decrypt(q.tokenEnc)}`;
+      const text = b.message ?? translate(L, "mail_body", { name: s.patient.name.split(" ")[0], clinic: s.clinic.name, link: url, date: fmtDate(q.validUntil, L) });
+      const [cl] = await tx`select email from clinics where id = ${c.clinicId}`;
+      await sendMail(to, translate(L, "mail_subj", { clinic: s.clinic.name }), text, { clinicId: c.clinicId, fromName: s.clinic.name, replyTo: cl?.email ?? undefined });
+      await tx`update quotes set sent_via = array(select distinct unnest(sent_via || '{email}'::text[])) where id = ${id}`;
+      await tx`insert into lead_events (clinic_id, lead_id, type, body, data, user_id) values (${c.clinicId}, ${q.leadId}, 'email', ${"Teklif e-postası: " + to}, ${tx.json({ quoteId: id } as never)}, ${c.userId})`;
       return { ok: true };
     });
   });

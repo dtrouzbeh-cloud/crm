@@ -3,8 +3,10 @@ import { ownerSql } from "./db.ts";
 import { decrypt } from "./lib/crypto.ts";
 import { wa, inWindow } from "./services/whatsapp.ts";
 import { dispatchWebhook } from "./services/webhooks.ts";
+import { deliver } from "./services/mailer.ts";
 export type JobHandler = (payload: Record<string, unknown>, clinicId: string | null) => Promise<void>;
 export const handlers: Record<string, JobHandler> = {
+  "mail.send": async (p) => { await deliver(p as never); },
   "webhook.dispatch": async (p, clinicId) => { await dispatchWebhook(Number(p.eventId), clinicId!); },
   "wa.autoreply": async (p) => {
     const [cv] = await ownerSql`select cv.*, a.access_token_enc, a.external_id as phone_id, a.config from conversations cv join channel_accounts a on a.id = cv.account_id where cv.id = ${p.conversationId as string}`;
