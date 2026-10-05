@@ -17,7 +17,7 @@ export async function ingestLead(clinicId: string, source: string, externalId: s
   return ownerSql.begin(async (tx0) => {
     const tx = tx0 as unknown as Tx;
     await tx`select set_config('app.clinic_id', ${clinicId}, true)`;
-    if (externalId) { const [ex] = await tx`select id, result from inbound_events where source = ${source} and external_id = ${externalId}`; if (ex) return { duplicate: true, ...(ex.result ?? {}) }; }
+    if (externalId) { const [ex] = await tx`select id, result from inbound_events where clinic_id = ${clinicId} and source = ${source} and external_id = ${externalId}`; if (ex) return { duplicate: true, ...(ex.result ?? {}) }; }
     const m = mapToLead(payload, opts.fieldMap);
     const [ev] = await tx`insert into inbound_events (clinic_id, source, external_id, payload) values (${clinicId}, ${source}, ${externalId}, ${tx.json(payload as never)}) returning id`;
     if (!m.fullName && !m.phone && !m.email) { await tx`update inbound_events set status = 'skipped', error = 'no contact fields' where id = ${ev!.id}`; return { skipped: true }; }

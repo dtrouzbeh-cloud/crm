@@ -25,6 +25,9 @@ const Deals = lazy(() => import("./pages/Deals.tsx"));
 const Soon = lazy(() => import("./pages/Soon.tsx"));
 const Reception = lazy(() => import("./pages/Reception.tsx"));
 const Trips = lazy(() => import("./pages/Trips.tsx"));
+const Inbox = lazy(() => import("./pages/Inbox.tsx"));
+const Reports = lazy(() => import("./pages/Reports.tsx"));
+const Admin = lazy(() => import("./pages/Admin.tsx"));
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, retry: (n, e: any) => n < 2 && !(e?.status >= 400 && e?.status < 500), refetchOnWindowFocus: true } } });
 
@@ -58,6 +61,9 @@ function App() {
       <Route path="/profile" component={Profile} />
       <Route path="/reception" component={Reception} />
       <Route path="/trips" component={Trips} />
+      <Route path="/inbox/:id?" component={Inbox} />
+      <Route path="/reports" component={Reports} />
+      <Route path="/admin" component={Admin} />
       <Route>{() => <Soon />}</Route>
     </Switch></Authed>}</Route>
   </Switch>;

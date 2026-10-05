@@ -4,6 +4,7 @@ import { withClinic, ownerSql } from "../db.ts";
 import { ctx, need, parse, HttpError, notFound } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { inviteMember } from "../auth.ts";
+import { enforce } from "./saas.ts";
 import { ROLES, ROLE_DEFAULTS, effectivePermissions, type Role, type Permissions } from "@dentaflow/core/permissions";
 
 export function clinicRoutes(app: FastifyInstance) {
@@ -48,6 +49,7 @@ export function clinicRoutes(app: FastifyInstance) {
   app.post("/api/team/invite", async (req) => {
     const c = need(ctx(req), "team.manage");
     const b = parse(z.object({ email: z.email(), role: z.enum(ROLES) }), req.body);
+    await enforce(c.clinicId, "seats");
     const link = await inviteMember(c.clinicId, c.userId, b.email.toLowerCase(), b.role);
     await withClinic(c.clinicId, (tx) => audit(tx, c, "team.invite", "invite", null, { email: b.email, role: b.role }));
     return { ok: true, link };   // bağlantı, e-posta kurulana kadar arayüzde de gösterilir

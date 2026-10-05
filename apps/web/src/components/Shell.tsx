@@ -21,13 +21,15 @@ export function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { data: tc } = useQuery({ queryKey: ["taskcounts"], queryFn: () => get("/api/tasks/counts"), refetchInterval: 60_000 });
   const { data: cc } = useQuery({ queryKey: ["casecounts"], queryFn: () => get("/api/cases?limit=1"), enabled: can("case.read"), refetchInterval: 120_000 });
+  const { data: ib } = useQuery({ queryKey: ["inboxunread"], queryFn: () => get("/api/inbox/unread"), enabled: can("inbox.use"), refetchInterval: 20_000 });
+  const { data: bill } = useQuery({ queryKey: ["billing"], queryFn: () => get("/api/billing"), staleTime: 10 * 60_000 });
   const [theme, setTheme] = useState(() => localStorage.getItem("df_theme") || "auto");
   useEffect(() => { const r = document.documentElement; if (theme === "auto") delete r.dataset.theme; else r.dataset.theme = theme; localStorage.setItem("df_theme", theme); }, [theme]);
   useEffect(() => { if (me?.clinic?.brandColor) { const r = document.documentElement; r.style.setProperty("--brand", me.clinic.brandColor); r.style.setProperty("--brand-soft", `color-mix(in srgb, ${me.clinic.brandColor} 13%, var(--card))`); } }, [me?.clinic?.brandColor]);
   useEffect(() => setOpen(false), [loc]);
 
   const NAV: NavItem[] = [
-    { sec: "sec_work" }, { id: "dash", ic: "dash", to: "/" }, { id: "tasks", ic: "tasks", to: "/tasks", badge: tc?.today }, { id: "inbox", ic: "inbox", to: "/inbox", perm: "inbox.use" },
+    { sec: "sec_work" }, { id: "dash", ic: "dash", to: "/" }, { id: "tasks", ic: "tasks", to: "/tasks", badge: tc?.today }, { id: "inbox", ic: "inbox", to: "/inbox", perm: "inbox.use", badge: ib?.n },
     { sec: "sec_sales" }, { id: "leads", ic: "users", to: "/leads", perm: "lead.read" }, { id: "quotes", ic: "file", to: "/quotes", perm: "case.read" }, { id: "deals", ic: "deal", to: "/deals", perm: "deal.read" },
     { sec: "sec_clinic" }, { id: "cases", ic: "tooth", to: "/cases", perm: "case.read", badge: cc?.counts?.pool }, { id: "reception", ic: "desk", to: "/reception", perm: "appointment.read" }, { id: "trips", ic: "plane", to: "/trips", perm: "trip.manage" },
     { sec: "sec_setup" }, { id: "catalog", ic: "book", to: "/catalog", perm: "catalog.manage" }, { id: "analytics", ic: "chart", to: "/reports", perm: "reports.view" }, { id: "settings", ic: "gear", to: "/settings", perm: "settings.manage" },
@@ -42,7 +44,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="logo"><i><Icon n="tooth" /></i><span>Denta<b>Flow</b></span></div>
       {me && me.clinics.length > 1 ? <div style={{ padding: "0 12px 6px" }}><select className="inp sm" value={me.clinic?.id} onChange={(e) => switchClinic(e.target.value)}>{me.clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         : <div className="small muted" style={{ padding: "0 18px 6px", fontWeight: 600 }}>{me?.clinic?.name}</div>}
-      <nav className="nav">{NAV.map((n, i) => n.sec ? <div key={i} className="sec">{t(n.sec)}</div> : (n.perm && !can(n.perm)) ? null :
+      <nav className="nav">{me?.user?.isPlatformAdmin && <Link href="/admin" className={loc.startsWith("/admin") ? "on" : ""}><Icon n="shield" /><span>{t("platform_admin")}</span></Link>}{NAV.map((n, i) => n.sec ? <div key={i} className="sec">{t(n.sec)}</div> : (n.perm && !can(n.perm)) ? null :
         <Link key={n.id} href={n.to!} className={active(n.to) ? "on" : ""}><Icon n={n.ic!} /><span>{t("nav_" + n.id)}</span>{n.badge ? <span className="bdg n">{n.badge}</span> : null}</Link>)}</nav>
       <div className="me"><Avatar name={me?.user?.name} /><div className="grow" style={{ minWidth: 0 }}><Link href="/profile" style={{ color: "inherit" }}><div style={{ fontWeight: 600, fontSize: 13 }}>{me?.user?.name}</div></Link>
         <div className="tiny muted">{me?.role ? t("role_" + me.role) : ""}</div></div><button className="btn ghost icon sm" title={t("logout")} onClick={logout}><Icon n="logout" /></button></div>
@@ -56,6 +58,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <button className="btn ghost icon" title={t("theme")} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}><Icon n={theme === "dark" ? "sun" : "moon"} /></button>
         <Notifications />
       </div>
+      {bill?.subscription?.status === "trialing" && bill.subscription.trialEndsAt && <div className="alert warn" style={{ borderRadius: 0, justifyContent: "center" }}><Icon n="clock" /><span>{t("trial_left", { n: Math.max(0, Math.ceil((new Date(bill.subscription.trialEndsAt).getTime() - Date.now()) / 86400000)) })}</span>{can("billing.manage") && <Link href="/settings/billing" style={{ fontWeight: 650 }}>{t("choose_plan")} →</Link>}</div>}
       <div className="page fade-in">{children}</div>
     </main>
   </div>;

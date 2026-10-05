@@ -52,7 +52,7 @@ export async function createClinicWithAdmin(input: { clinicName: string; country
     const [clinic] = await tx`insert into clinics (slug, name, country, default_currency, default_language, settings)
       values (${slug}, ${input.clinicName}, ${input.country}, ${input.currency}, ${input.language}, ${tx.json(defaultClinicSettings() as never)}) returning id, slug`;
     await tx`insert into memberships (clinic_id, user_id, role) values (${clinic!.id}, ${input.userId}, 'admin')`;
-    await tx`insert into subscriptions (clinic_id, plan_id, status, seats, trial_ends_at) values (${clinic!.id}, 'pro', 'trialing', 3, now() + interval '14 days')`;
+    await tx`insert into subscriptions (clinic_id, plan_id, status, seats, trial_ends_at) values (${clinic!.id}, 'pro', 'trialing', 10, now() + interval '14 days')`;
     for (const r of defaultWorkflowRules()) await tx`insert into workflow_rules (clinic_id, name, trigger, actions) values (${clinic!.id}, ${r.name}, ${tx.json(r.trigger as never)}, ${tx.json(r.actions as never)})`;
     await seedClinicCatalog(tx as never, clinic!.id as string);
     return clinic as { id: string; slug: string };

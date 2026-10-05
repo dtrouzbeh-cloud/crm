@@ -26,3 +26,8 @@ export const meta = {
   configId: process.env.META_ES_CONFIG_ID ?? "",     // Embedded Signup yapılandırma kimliği
   graph: process.env.META_GRAPH_URL ?? "https://graph.facebook.com/v21.0",
 };
+// Platform SaaS faturalandırması (kliniklerden abonelik tahsilatı)
+export const billing = {
+  stripeSecret: process.env.PLATFORM_STRIPE_SECRET ?? "",
+  stripeWebhookSecret: process.env.PLATFORM_STRIPE_WEBHOOK_SECRET ?? "",
+};

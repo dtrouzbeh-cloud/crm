@@ -9,6 +9,7 @@ import { randomToken, sha256, encrypt } from "../lib/crypto.ts";
 import { calcOption, checkRules, spansFor, stayDays, hasImplants, BANNED_WORDS, type PriceOption, type Catalog, type PlanItem, type Situation } from "@dentaflow/core/engine";
 import { translate } from "@dentaflow/core/i18n";
 import { medicalOf } from "../routes/cases.ts";
+import { enforce } from "../routes/saas.ts";
 
 export interface Pricing {
   currency: string; language: string; nOpt: number; mode: "mat" | "diff"; options: PriceOption[];
@@ -47,6 +48,7 @@ export async function preSendChecks(tx: Tx, c: Ctx, k: Record<string, any>, cat:
 }
 
 export async function createQuote(tx: Tx, c: Ctx, caseId: string, appUrl: string) {
+  await enforce(c.clinicId, "quotes");
   const [k] = await tx`select * from cases where id = ${caseId}`;
   if (!k) throw new HttpError(404, "not_found");
   const p = k.pricing as Pricing | null;

@@ -8,13 +8,14 @@ import { Icon } from "../components/Icon.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
 import { LEAD_STAGES, STAGE_COL, StageBadge, stageLabel, TEMP, flag, FLAGS } from "../lib/format.tsx";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
+import ImportModal from "./ImportModal.tsx";
 
 export default function Leads() {
   const { t, rel } = useT(); const can = useCan(); const search = useSearch(); const [, nav] = useLocation();
   const sp = new URLSearchParams(search);
   const [view, setView] = useState(() => localStorage.getItem("df_leadview") || "list");
   const [tab, setTab] = useState(sp.get("stage") ?? "active");
-  const [q, setQ] = useState(""); const [dq, setDq] = useState(""); const [page, setPage] = useState(0); const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState(""); const [dq, setDq] = useState(""); const [page, setPage] = useState(0); const [adding, setAdding] = useState(false); const [importing, setImporting] = useState(false);
   useEffect(() => { const h = setTimeout(() => { setDq(q); setPage(0); }, 250); return () => clearTimeout(h); }, [q]);
   useEffect(() => localStorage.setItem("df_leadview", view), [view]);
   const isStage = LEAD_STAGES.includes(tab);
@@ -32,6 +33,7 @@ export default function Leads() {
     <PageHead title={t("nav_leads")} sub={t("leads_sub", { n: data?.total ?? "…" })} actions={<>
       <input className="inp" placeholder={t("filter_ph")} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />
       <div className="seg"><button className={view === "list" ? "on" : ""} onClick={() => setView("list")} title={t("list")}><Icon n="list" /></button><button className={view === "kanban" ? "on" : ""} onClick={() => setView("kanban")} title="Kanban"><Icon n="kanban" /></button></div>
+      {can("lead.import") && <button className="btn" onClick={() => setImporting(true)}><Icon n="upload" />{t("import")}</button>}
       {can("lead.write") && <button className="btn pri" onClick={() => setAdding(true)}><Icon n="plus" />{t("new_lead")}</button>}</>} />
     {view === "kanban" ? <Kanban items={data?.items ?? []} onMove={moveStage} /> :
       <div className="card"><div className="tabs" style={{ padding: "0 8px" }}>
@@ -51,6 +53,7 @@ export default function Leads() {
         </div> : <Empty icon="users" text={t("no_results")} action={can("lead.write") ? <button className="btn pri" onClick={() => setAdding(true)}><Icon n="plus" />{t("new_lead")}</button> : null} />}
       </div>}
     {adding && <NewLeadDrawer onClose={() => setAdding(false)} />}
+    {importing && <ImportModal onClose={() => setImporting(false)} />}
   </>;
 }
 
