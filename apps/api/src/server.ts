@@ -15,6 +15,14 @@ import { registerModules } from "./modules.ts";
 export async function buildServer() {
   const app = Fastify({ logger: { level: config.isProd ? "info" : "warn" }, trustProxy: true, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie, { secret: config.sessionSecret });
+  // Ham gövde: webhook imza doğrulaması için saklanır
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
+    (req as any).rawBody = body;
+    try { done(null, body ? JSON.parse(body as string) : {}); } catch (e) { (e as any).statusCode = 400; done(e as Error, undefined); }
+  });
+  app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (req, body, done) => {
+    (req as any).rawBody = body; done(null, Object.fromEntries(new URLSearchParams(body as string)));
+  });
 
   // Basit hız limiti (bellek içi, IP + yol grubu başına): kimlik uçları 20/dk, public uçlar 60/dk
   const hits = new Map<string, { n: number; t: number }>();

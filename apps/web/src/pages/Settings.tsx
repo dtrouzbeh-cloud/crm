@@ -9,6 +9,7 @@ import { Icon } from "../components/Icon.tsx";
 import { useMe, useCan, useInvalidateMe } from "../lib/auth.ts";
 import { ROLES, type Role } from "@dentaflow/core/permissions";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
+import PaymentsTab from "./settings/Payments.tsx";
 
 const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
 
@@ -18,7 +19,7 @@ export default function Settings() {
     <PageHead title={t("nav_settings")} sub={t("settings_sub")} />
     <div className="tabs" style={{ marginBottom: 14 }}>{TABS.map(([k, l, ic]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => nav(`/settings/${k}`)}><Icon n={ic} size={15} />{t(l)}</button>)}</div>
     {tab === "general" && <General />}{tab === "team" && <Team />}{tab === "roles" && <Roles />}{tab === "workflows" && <Workflows />}{tab === "content" && <Content />}{tab === "audit" && <Audit />}
-    {tab === "payments" && <LazyTab name="payments" />}{tab === "integrations" && <LazyTab name="integrations" />}{tab === "billing" && <LazyTab name="billing" />}
+    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <LazyTab name="integrations" />}{tab === "billing" && <LazyTab name="billing" />}
   </>;
 }
 function LazyTab({ name }: { name: string }) {

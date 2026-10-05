@@ -4,6 +4,8 @@ import { put } from "../../lib/api.ts";
 import { toastErr, confirmBox } from "../../components/ui.tsx";
 import { Icon } from "../../components/Icon.tsx";
 import { Chart } from "../../components/Chart.tsx";
+import { Upload } from "../../components/Upload.tsx";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useCan } from "../../lib/auth.ts";
 import { toothStates, SITUATIONS, UPPER, LOWER, jawOf, type Catalog, type Situation } from "@dentaflow/core/engine";
 
@@ -11,7 +13,7 @@ const SIT_COL: Record<string, string> = { intact: "#F3EBD9", missing: "#FFFFFF",
 const FIND: [string, string][] = [["sinusSark", "#5E97BD"], ["kemikAz", "#D4A017"]];
 
 export default function StepSituation({ data, cat, onDone }: { data: any; cat: Catalog; onDone: () => void }) {
-  const { t } = useT(); const can = useCan(); const { data: me } = useMe();
+  const { t } = useT(); const can = useCan(); const { data: me } = useMe(); const qc = useQueryClient();
   const k = data.case;
   const [sit, setSit] = useState<Situation>(k.situation ?? {});
   const [brush, setBrush] = useState("missing");
@@ -55,7 +57,8 @@ export default function StepSituation({ data, cat, onDone }: { data: any; cat: C
         <div><span className="muted">{t("issue")}:</span> {data.patient?.issue || "—"}</div>
         <div><span className="muted">{t("anamnesis")}:</span> {data.medical?.flags?.length ? data.medical.flags.map((f: string) => <span key={f} className="bdg err" style={{ marginInlineEnd: 4 }}>{t("med_" + f)}</span>) : t("none")}</div>
         {k.dentistNote && <div className="note"><b>{t("dentist_note")}:</b> {k.dentistNote}</div>}
-        <div className="row wrap" style={{ gap: 6 }}><span className="muted">{t("files")}:</span><span className="bdg">📷 {data.files.filter((f: any) => f.kind === "photo").length}</span><span className="bdg">🩻 {data.files.filter((f: any) => f.kind === "xray").length}</span></div>
+        <div className="tiny muted">📷 {t("photos")}</div><Upload kind="photo" entity="case" entityId={k.id} files={data.files} onDone={() => qc.invalidateQueries({ queryKey: ["case", k.id] })} accept="image/*" />
+        <div className="tiny muted">🩻 X-ray / CBCT</div><Upload kind="xray" entity="case" entityId={k.id} files={data.files} onDone={() => qc.invalidateQueries({ queryKey: ["case", k.id] })} />
       </div></div>
       <div className="row"><button className="btn" onClick={async () => { await put(`/api/cases/${k.id}/situation`, { situation: sit, done: true, skipped: true }); onDone(); }}>{t("skip")}</button><span className="grow" />
         <button className="btn pri" onClick={async () => { await put(`/api/cases/${k.id}/situation`, { situation: sit, done: true, skipped: false }); onDone(); }}>{t("save_continue")} →</button></div>
