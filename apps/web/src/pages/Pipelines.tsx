@@ -8,6 +8,7 @@ import { PageHead, Spinner, Drawer, Modal, toast, toastErr, Avatar, Switch, conf
 import { Icon } from "../components/Icon.tsx";
 import { useCan } from "../lib/auth.ts";
 import { TEMP, flag, stageLabel } from "../lib/format.tsx";
+import { RecallRulesDrawer, UpcomingRecalls } from "../components/Recalls.tsx";
 
 const pname = (p: any, lang: string) => p.name?.[lang] ?? p.name?.default ?? p.name?.en ?? p.kind;
 const dur = (s: number | null | undefined) => (s == null ? "—" : s < 3600 ? Math.round(s / 60) + " dk" : s < 86400 ? (s / 3600).toFixed(1) + " sa" : (s / 86400).toFixed(1) + " g");
@@ -16,7 +17,7 @@ export default function Pipelines() {
   const { t, lang } = useT(); const can = useCan(); const [, nav] = useLocation(); const qc = useQueryClient();
   const { id } = useParams<{ id?: string }>();
   const { data: pls } = useQuery({ queryKey: ["pipelines"], queryFn: () => get<any[]>("/api/pipelines") });
-  const [edit, setEdit] = useState(false); const [q, setQ] = useState(""); const [status, setStatus] = useState("open");
+  const [edit, setEdit] = useState(false); const [rules, setRules] = useState(false); const [q, setQ] = useState(""); const [status, setStatus] = useState("open");
   const p = pls?.find((x) => x.id === id) ?? pls?.find((x) => x.active);
   const { data: board } = useQuery({ queryKey: ["pboard", p?.id, q, status], queryFn: () => get(`/api/pipelines/${p!.id}/board` + qs({ q, status })), enabled: !!p });
   const { data: an } = useQuery({ queryKey: ["panalytics", p?.id], queryFn: () => get(`/api/pipelines/${p!.id}/analytics`), enabled: !!p && can("reports.view") });
@@ -31,7 +32,10 @@ export default function Pipelines() {
     {an?.forecast?.length > 0 && <div className="row wrap" style={{ gap: 10, marginBottom: 12 }}>{an.forecast.map((f: any) => <div key={f.currency} className="card pad" style={{ padding: "10px 14px" }}>
       <div className="tiny muted">{t("forecast")} · {f.currency} · {f.n} lead</div><div className="row" style={{ gap: 12 }}><b className="num" style={{ fontSize: 18 }}>{(f.weighted / 100).toLocaleString(lang, { style: "currency", currency: f.currency, maximumFractionDigits: 0 })}</b>
         <span className="small muted">/ {(f.pipeline / 100).toLocaleString(lang, { style: "currency", currency: f.currency, maximumFractionDigits: 0 })} {t("pipeline_total")}</span></div></div>)}</div>}
+    {p.kind === "recall" && <div className="row" style={{ gap: 8, marginBottom: 10 }}><button className="btn sm" onClick={() => setRules(true)}><Icon n="gear" />{t("recall_rules")}</button></div>}
     {!board ? <Spinner /> : <Board board={board} analytics={an} onMoved={refresh} />}
+    {p.kind === "recall" && <UpcomingRecalls />}
+    {rules && <RecallRulesDrawer onClose={() => setRules(false)} />}
     {edit && <StageEditor pipeline={p} onClose={() => { setEdit(false); refresh(); }} />}
   </>;
 }

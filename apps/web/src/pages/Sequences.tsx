@@ -12,7 +12,7 @@ import { salesStageOrder, stageLabel } from "../lib/format.tsx";
 const KINDS = ["whatsapp", "email", "task", "stage", "tag", "form", "wait", "sms", "ai_message", "ai_call"] as const;
 const KIND_IC: Record<string, string> = { whatsapp: "wa", email: "mail", task: "tasks", stage: "kanban", tag: "list", form: "pen", wait: "clock", sms: "phone", ai_message: "spark", ai_call: "phone" };
 const SOON = new Set(["sms", "ai_message", "ai_call"]);
-const EVENTS = ["", "lead.created", "lead.stage", "quote.sent", "quote.viewed", "deal.created", "deal.stage", "pipeline.stage_entered", "pipeline.sla_breached", "form.completed"];
+const EVENTS = ["", "lead.created", "lead.stage", "quote.sent", "quote.viewed", "deal.created", "deal.stage", "pipeline.stage_entered", "pipeline.sla_breached", "form.completed", "recall.due"];
 const STOPS = ["replied", "quote_viewed", "quote_accepted", "deal_created", "stage_won", "stage_lost", "stage_changed", "form_completed", "paid", "opted_out"];
 const LANGS = ["tr", "en", "de", "ar"];
 
