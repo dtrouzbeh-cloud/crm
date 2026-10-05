@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { encrypt } from "../lib/crypto.ts";
 import { maskValue } from "@dentaflow/core/permissions";
@@ -13,7 +13,7 @@ export function opsRoutes(app: FastifyInstance) {
   app.put("/api/deals/:id/trips/:no", async (req) => {
     const c = need(ctx(req), "trip.manage");
     const { id, no } = req.params as { id: string; no: string };
-    const b = parse(z.object({
+    const b = parsePatch(z.object({
       passport: z.object({ fullName: z.string().max(120), number: z.string().max(30), expiry: z.string().max(20), nationality: z.string().max(40), birthDate: z.string().max(20).optional() }).partial().nullable(),
       flight: z.object({ outbound: flightLeg, return: flightLeg, cost: z.number().optional(), booked: z.boolean().optional(), ticketFileId: z.string().optional(), pnr: z.string().max(20).optional() }).partial(),
       hotel: z.object({ hotelId: z.string().nullable(), name: z.string().max(120), room: z.string().max(40), checkIn: z.string().max(20), checkOut: z.string().max(20), cost: z.number(), booked: z.boolean(), confirmation: z.string().max(60) }).partial(),
@@ -48,7 +48,7 @@ export function opsRoutes(app: FastifyInstance) {
   app.patch("/api/runs/:id", async (req) => {
     const c = need(ctx(req), "trip.manage");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ status: z.enum(["planned", "dispatched", "done", "canceled"]), runAt: z.iso.datetime(), driverName: z.string().max(80), driverPhone: z.string().max(40), note: z.string().max(500) }).partial(), req.body);
+    const b = parsePatch(z.object({ status: z.enum(["planned", "dispatched", "done", "canceled"]), runAt: z.iso.datetime(), driverName: z.string().max(80), driverPhone: z.string().max(40), note: z.string().max(500) }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries({ status: "status", runAt: "run_at", driverName: "driver_name", driverPhone: "driver_phone", note: "note" })) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];
       await tx`update transfer_runs set ${tx(set as never)} where id = ${id}`; return { ok: true };
@@ -112,7 +112,7 @@ export function opsRoutes(app: FastifyInstance) {
   app.patch("/api/appointments/:id", async (req) => {
     const c = need(ctx(req), "appointment.manage");
     const { id } = req.params as { id: string };
-    const b = parse(apptBody.partial(), req.body);
+    const b = parsePatch(apptBody.partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const set: Record<string, unknown> = {};
       for (const [k, col] of Object.entries({ title: "title", startAt: "start_at", endAt: "end_at", dentistId: "dentist_id", translatorId: "translator_id", chair: "chair", notes: "notes", status: "status", planItemIds: "plan_item_ids" })) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];

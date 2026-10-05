@@ -10,6 +10,7 @@ import { minor, flag } from "../lib/format.tsx";
 import { vcol } from "@dentaflow/core/chart";
 import { DealInvoices } from "../components/Invoice.tsx";
 import { AmendmentsPanel } from "../components/Amendments.tsx";
+import { CustomFieldsCard } from "./settings/Fields.tsx";
 
 const stageLabel = (t: (k: string, p?: any) => string, s: string) => s.startsWith("visit_") ? t("ds_v", { n: s.slice(6) }) : t("ds_" + s);
 
@@ -80,6 +81,7 @@ function DealDrawer({ id, onClose }: { id: string; onClose: () => void }) {
         <td>{p.kind === "payment" && can("payment.refund") && <button className="btn xs ghost" onClick={async () => { const note = prompt(t("refund_reason")); if (!note) return; try { await post(`/api/deals/${id}/payments/${p.id}/reverse`, { note }); refresh(); } catch (e) { toastErr(e); } }}>{t("refund")}</button>}</td></tr>)}</tbody></table> : <div className="empty small">{t("no_payments")}</div>}
       {data.intents.filter((i: any) => i.status === "pending" && i.provider === "bank_transfer").map((i: any) => <div key={i.id} className="alert info"><Icon n="info" /><span className="grow">{t("pending_transfer")}: <b className="code">{i.referenceCode}</b> · {M(i.amountMinor)}</span>{can("payment.record") && <button className="btn sm" onClick={async () => { await post(`/api/payment-intents/${i.id}/confirm`); refresh(); toast(t("payment_saved")); }}>{t("confirm_received")}</button>}</div>)}
       <DealInvoices dealId={id} payments={data.payments} />
+      <div style={{ marginTop: 16 }}><CustomFieldsCard entity="deal" values={d.custom ?? {}} editable={can("deal.write")} onSave={async (cf) => { try { await patch(`/api/deals/${id}`, { custom: cf }); refresh(); toast(t("saved")); } catch (e) { toastErr(e); } }} /></div>
     </>}
     {tab === "visits" && <table className="tbl"><thead><tr><th>{t("visit")}</th><th>{t("arrival")}</th><th>{t("departure")}</th><th>{t("status")}</th><th className="r">{t("planned")}</th><th className="r">{t("paid")}</th></tr></thead><tbody>
       {data.visits.map((v: any) => <tr key={v.visitNo}><td><span className="dot" style={{ background: vcol(v.visitNo) }} /> {t("visit_n", { n: v.visitNo })}</td>

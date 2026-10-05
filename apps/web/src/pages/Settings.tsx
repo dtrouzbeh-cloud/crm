@@ -13,8 +13,9 @@ import PaymentsTab from "./settings/Payments.tsx";
 import IntegrationsTab from "./settings/Integrations.tsx";
 import BillingTab from "./settings/Billing.tsx";
 import FormsTab from "./settings/Forms.tsx";
+import FieldsTab from "./settings/Fields.tsx";
 
-const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["forms", "forms", "pen"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
+const TABS = [["general", "general", "gear"], ["team", "team", "users"], ["roles", "roles_perms", "shield"], ["workflows", "workflows", "spark"], ["content", "content", "file"], ["forms", "forms", "pen"], ["fields", "custom_fields", "list"], ["payments", "payments", "card"], ["integrations", "integrations", "plug"], ["billing", "billing", "building"], ["audit", "audit_log", "list"]] as const;
 
 export default function Settings() {
   const { tab = "general" } = useParams<{ tab?: string }>(); const [, nav] = useLocation(); const { t } = useT();
@@ -22,7 +23,7 @@ export default function Settings() {
     <PageHead title={t("nav_settings")} sub={t("settings_sub")} />
     <div className="tabs" style={{ marginBottom: 14 }}>{TABS.map(([k, l, ic]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => nav(`/settings/${k}`)}><Icon n={ic} size={15} />{t(l)}</button>)}</div>
     {tab === "general" && <General />}{tab === "team" && <Team />}{tab === "roles" && <Roles />}{tab === "workflows" && <Workflows />}{tab === "content" && <Content />}{tab === "audit" && <Audit />}
-    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}{tab === "forms" && <FormsTab />}
+    {tab === "payments" && <PaymentsTab />}{tab === "integrations" && <IntegrationsTab />}{tab === "billing" && <BillingTab />}{tab === "forms" && <FormsTab />}{tab === "fields" && <FieldsTab />}
   </>;
 }
 function LazyTab({ name }: { name: string }) {

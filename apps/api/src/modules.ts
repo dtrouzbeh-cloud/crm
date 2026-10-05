@@ -16,6 +16,7 @@ import { formRoutes } from "./routes/forms.ts";
 import { financeRoutes } from "./routes/finance.ts";
 import { amendmentRoutes } from "./routes/amendments.ts";
 import { interpreterRoutes } from "./routes/interpreter.ts";
+import { recordRoutes } from "./routes/records.ts";
 export async function registerModules(app: FastifyInstance): Promise<void> {
-  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app); inboxRoutes(app); integrationRoutes(app); saasRoutes(app); reportRoutes(app); formRoutes(app); financeRoutes(app); amendmentRoutes(app); interpreterRoutes(app);
+  catalogRoutes(app); caseRoutes(app); quoteRoutes(app); publicRoutes(app); dealRoutes(app); paymentRoutes(app); opsRoutes(app); await fileRoutes(app); inboxRoutes(app); integrationRoutes(app); saasRoutes(app); reportRoutes(app); formRoutes(app); financeRoutes(app); amendmentRoutes(app); interpreterRoutes(app); recordRoutes(app);
 }

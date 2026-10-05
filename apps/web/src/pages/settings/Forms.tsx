@@ -62,7 +62,7 @@ function Editor({ init, onClose, onSaved }: { init: any; onClose: () => void; on
   const [f, setF] = useState<any>(init); const set = (p: any) => setF({ ...f, ...p });
   const setField = (i: number, p: any) => set({ fields: f.fields.map((x: any, j: number) => (j === i ? { ...x, ...p } : x)) });
   const move = (i: number, d: number) => { const a = [...f.fields]; const [x] = a.splice(i, 1); a.splice(i + d, 0, x); set({ fields: a }); };
-  const add = (type: string) => { let n = 1; while (f.fields.some((x: any) => x.key === `${type}_${n}`)) n++; set({ fields: [...f.fields, { key: `${type}_${n}`, type, label: "", required: false }] }); };
+  const add = (type: string) => { let n = 1; while (f.fields.some((x: any) => x.key === `${type}${n}`)) n++; set({ fields: [...f.fields, { key: `${type}${n}`, type, label: "", required: false }] }); };
   const save = async () => {
     const body = { kind: f.kind, name: f.name, lang: f.lang, title: f.title, body: f.body, requireSignature: f.requireSignature, active: f.active,
       fields: f.fields.map((x: any) => ({ key: x.key, type: x.type, label: x.label || x.key, required: !!x.required, ...(x.options?.length ? { options: x.options } : {}), ...(x.flag ? { flag: x.flag } : {}), ...(x.map ? { map: x.map } : {}) })) };

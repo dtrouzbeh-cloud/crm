@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql } from "../db.ts";
 import { config, billing } from "../config.ts";
-import { ctx, need, parse, notFound, HttpError } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { verifyStripeSignature } from "../services/payments.ts";
 
@@ -104,7 +104,7 @@ export function saasRoutes(app: FastifyInstance) {
   });
   app.patch("/api/admin/clinics/:id", async (req) => {
     const uid = await requireAdmin(req); const { id } = req.params as { id: string };
-    const b = parse(z.object({ status: z.enum(["trial", "active", "past_due", "suspended", "canceled"]), planId: z.string(), seats: z.number().int().min(1), extendTrialDays: z.number().int().min(1).max(365), manualPaidUntil: z.iso.datetime() }).partial(), req.body);
+    const b = parsePatch(z.object({ status: z.enum(["trial", "active", "past_due", "suspended", "canceled"]), planId: z.string(), seats: z.number().int().min(1), extendTrialDays: z.number().int().min(1).max(365), manualPaidUntil: z.iso.datetime() }).partial(), req.body);
     if (b.status) await ownerSql`update clinics set status = ${b.status} where id = ${id}`;
     if (b.planId) await ownerSql`update subscriptions set plan_id = ${b.planId} where clinic_id = ${id}`;
     if (b.seats) await ownerSql`update subscriptions set seats = ${b.seats} where clinic_id = ${id}`;

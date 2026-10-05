@@ -33,5 +33,11 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
   if (!r.success) throw new HttpError(400, "validation", "Geçersiz veri", z.flattenError(r.error).fieldErrors);
   return r.data;
 }
+/** Kısmi güncelleme: şema varsayılanları uygulanmaz — yalnız gövdede gönderilen alanlar döner */
+export function parsePatch<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
+  const out = parse(schema, data) as Record<string, unknown>;
+  if (data && typeof data === "object" && !Array.isArray(data)) { const sent = new Set(Object.keys(data)); for (const k of Object.keys(out)) if (!sent.has(k)) delete out[k]; }
+  return out as z.infer<T>;
+}
 export type Req = FastifyRequest; export type Rep = FastifyReply;
 export const ipOf = (req: FastifyRequest) => (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.ip;

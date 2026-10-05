@@ -75,7 +75,7 @@ function ViewForm({ id, onClose }: { id: string; onClose: () => void }) {
       </div> : <>
         {s.body && <div className="small" style={{ whiteSpace: "pre-wrap", background: "var(--subtle)", padding: 12, borderRadius: 8, marginBottom: 12, maxHeight: 260, overflow: "auto" }}>{s.body.replace(/\*\*/g, "")}</div>}
         <table className="tbl"><tbody>{s.fields.map((f: any) => f.type === "heading" ? <tr key={f.key}><th colSpan={2} style={{ paddingTop: 14 }}>{f.label}</th></tr>
-          : <tr key={f.key}><td className="small" style={{ width: "60%" }}>{f.label}</td><td className="small">{fmtAnswer(t, f, r.answers?.[f.key])}</td></tr>)}</tbody></table>
+          : <tr key={f.key}><td className="small" style={{ width: "60%" }}>{f.label}</td><td className="small">{fmtAnswer(t, f, r.answers?.[f.key] ?? r.answers?.[f.key.replace(/_([a-z0-9])/g, (_m: string, ch: string) => ch.toUpperCase())])}</td></tr>)}</tbody></table>
         {r.signatureUrl && <div style={{ marginTop: 14 }}><div className="tiny muted">{t("signature")}: <b>{r.signedName}</b></div><img src={r.signatureUrl} alt="signature" style={{ maxWidth: 320, border: "1px solid var(--line)", borderRadius: 8, background: "#fff" }} /></div>}
         <div className="tiny faint" style={{ marginTop: 12, wordBreak: "break-all" }}>IP {r.ip} · {r.userAgent?.slice(0, 90)}<br />SHA-256 {r.docHash}</div>
       </>}

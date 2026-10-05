@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { decrypt } from "../lib/crypto.ts";
 import { accrueCommissions } from "../services/finance.ts";
+import { cleanCustom } from "./records.ts";
 
 function dealScope(tx: Tx, c: Ctx) {
   return c.perms["deal.read"] === "own" ? tx`and d.owner_id = ${c.userId}` : tx``;
@@ -80,7 +81,7 @@ export function dealRoutes(app: FastifyInstance) {
   app.patch("/api/deals/:id", async (req) => {
     const c = need(ctx(req), "deal.write");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ stage: z.string().max(20), status: z.enum(["open", "won", "lost", "postponed"]), ownerId: z.uuid().nullable(), title: z.string().min(1).max(200), lostReason: z.string().max(60).nullable(), tags: z.array(z.string().max(40)).max(30) }).partial(), req.body);
+    const b = parsePatch(z.object({ stage: z.string().max(20), status: z.enum(["open", "won", "lost", "postponed"]), ownerId: z.uuid().nullable(), title: z.string().min(1).max(200), lostReason: z.string().max(60).nullable(), custom: z.record(z.string(), z.unknown()), tags: z.array(z.string().max(40)).max(30) }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const [d] = await tx`select id, stage, status, lead_id from deals d where d.id = ${id} ${dealScope(tx, c)}`;
       if (!d) throw notFound("Deal");
@@ -89,7 +90,8 @@ export function dealRoutes(app: FastifyInstance) {
       if (b.stage === "won") { set.status = "won"; set.closed_at = new Date(); }
       if (b.status === "lost" || b.status === "postponed") set.closed_at = b.status === "lost" ? new Date() : null;
       if (b.status === "open") set.closed_at = null;
-      await tx`update deals set ${tx(set as never)} where id = ${id}`;
+      if (b.custom) { const cc = await cleanCustom(tx, c.clinicId, "deal", b.custom); if (Object.keys(cc).length) await tx`update deals set custom = custom || ${tx.json(cc as never)} where id = ${id}`; }
+      if (Object.keys(set).length) await tx`update deals set ${tx(set as never)} where id = ${id}`;
       if (b.stage && b.stage.startsWith("visit_")) await tx`update deal_visits set status = 'done' where deal_id = ${id} and visit_no <= ${Number(b.stage.slice(6))} and status <> 'canceled'`;
       if (b.status === "lost") await tx`update leads set stage = 'lost', lost_reason = coalesce(${b.lostReason ?? null}, lost_reason) where id = ${d.leadId}`;
       await audit(tx, c, "deal.update", "deal", id, b);
@@ -101,7 +103,7 @@ export function dealRoutes(app: FastifyInstance) {
   app.patch("/api/deals/:id/visits/:no", async (req) => {
     const c = need(ctx(req), "deal.write");
     const { id, no } = req.params as { id: string; no: string };
-    const b = parse(z.object({ arrivalAt: z.iso.datetime().nullable(), departureAt: z.iso.datetime().nullable(), status: z.enum(["planned", "scheduled", "arrived", "in_treatment", "done", "canceled"]), plannedMinor: z.number().int().min(0) }).partial(), req.body);
+    const b = parsePatch(z.object({ arrivalAt: z.iso.datetime().nullable(), departureAt: z.iso.datetime().nullable(), status: z.enum(["planned", "scheduled", "arrived", "in_treatment", "done", "canceled"]), plannedMinor: z.number().int().min(0) }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const set: Record<string, unknown> = {};
       for (const [k, col] of Object.entries({ arrivalAt: "arrival_at", departureAt: "departure_at", status: "status", plannedMinor: "planned_minor" })) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];

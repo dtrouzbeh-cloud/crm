@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql } from "../db.ts";
-import { ctx, need, parse, HttpError, notFound } from "../http.ts";
+import { ctx, need, parse, parsePatch, HttpError, notFound } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { inviteMember } from "../auth.ts";
 import { enforce } from "./saas.ts";
@@ -16,7 +16,7 @@ export function clinicRoutes(app: FastifyInstance) {
 
   app.patch("/api/clinic", async (req) => {
     const c = need(ctx(req), "settings.manage");
-    const b = parse(z.object({
+    const b = parsePatch(z.object({
       name: z.string().min(2).max(120), legalName: z.string().max(200).nullable(), country: z.string().length(2), city: z.string().max(80).nullable(),
       address: z.string().max(300).nullable(), phone: z.string().max(40).nullable(), email: z.email().nullable().or(z.literal("")), website: z.string().max(200).nullable(), taxId: z.string().max(40).nullable(),
       brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), defaultCurrency: z.string().length(3), currencies: z.array(z.string().length(3)).min(1).max(15),
@@ -65,7 +65,7 @@ export function clinicRoutes(app: FastifyInstance) {
   app.patch("/api/team/:id", async (req) => {
     const c = need(ctx(req), "team.manage");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ role: z.enum(ROLES), title: z.string().max(80).nullable(), languages: z.array(z.string().max(5)).max(15), active: z.boolean(),
+    const b = parsePatch(z.object({ role: z.enum(ROLES), title: z.string().max(80).nullable(), languages: z.array(z.string().max(5)).max(15), active: z.boolean(),
       canOwnLeads: z.boolean(), reportsTo: z.uuid().nullable(), permissionOverrides: z.record(z.string(), z.unknown()) }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const [m] = await tx`select user_id, role from memberships where id = ${id}`;
@@ -93,7 +93,7 @@ export function clinicRoutes(app: FastifyInstance) {
     const c = need(ctx(req), "team.manage");
     const { role } = parse(z.object({ role: z.enum(ROLES) }), req.params);
     if (role === "admin") throw new HttpError(400, "admin_locked", "Yönetici rolü değiştirilemez");
-    const perms = parse(z.record(z.string(), z.unknown()), req.body);
+    const perms = parsePatch(z.record(z.string(), z.unknown()), req.body);
     await withClinic(c.clinicId, async (tx) => {
       await tx`insert into role_permissions (clinic_id, role, permissions) values (${c.clinicId}, ${role}, ${tx.json(perms as never)}) on conflict (clinic_id, role) do update set permissions = excluded.permissions`;
       await audit(tx, c, "role.update", "role", role, perms);
@@ -115,7 +115,7 @@ export function clinicRoutes(app: FastifyInstance) {
   app.put("/api/workflows/:id", async (req) => {
     const c = need(ctx(req), "settings.manage");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ name: z.string().min(1).max(120), trigger: z.record(z.string(), z.unknown()), actions: z.array(z.record(z.string(), z.unknown())).min(1).max(10), active: z.boolean() }).partial(), req.body);
+    const b = parsePatch(z.object({ name: z.string().min(1).max(120), trigger: z.record(z.string(), z.unknown()), actions: z.array(z.record(z.string(), z.unknown())).min(1).max(10), active: z.boolean() }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       if (id === "new") {
         const [r] = await tx`insert into workflow_rules (clinic_id, name, trigger, actions, active) values (${c.clinicId}, ${b.name ?? "Yeni kural"}, ${tx.json((b.trigger ?? { event: "lead.created" }) as never)}, ${tx.json((b.actions ?? []) as never)}, ${b.active ?? true}) returning id`;

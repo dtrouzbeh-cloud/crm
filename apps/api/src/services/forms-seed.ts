@@ -43,8 +43,8 @@ const EN: T[] = [
     body: "Thank you for choosing us. It takes less than a minute and helps us improve.",
     fields: [
       { key: "nps", type: "nps", label: "How likely are you to recommend us to a friend? (0–10)", required: true },
-      { key: "r_treat", type: "rating", label: "Treatment & results" }, { key: "r_coord", type: "rating", label: "Coordinator & communication" },
-      { key: "r_travel", type: "rating", label: "Hotel & transfer" }, { key: "comment", type: "textarea", label: "Anything you would like to tell us?" },
+      { key: "rTreat", type: "rating", label: "Treatment & results" }, { key: "rCoord", type: "rating", label: "Coordinator & communication" },
+      { key: "rTravel", type: "rating", label: "Hotel & transfer" }, { key: "comment", type: "textarea", label: "Anything you would like to tell us?" },
     ] },
 ];
 
@@ -85,8 +85,8 @@ const TR: T[] = [
     body: "Bizi tercih ettiğiniz için teşekkürler. Bir dakikadan kısa sürer ve gelişmemize yardımcı olur.",
     fields: [
       { key: "nps", type: "nps", label: "Bizi bir arkadaşınıza tavsiye etme olasılığınız nedir? (0–10)", required: true },
-      { key: "r_treat", type: "rating", label: "Tedavi ve sonuç" }, { key: "r_coord", type: "rating", label: "Koordinatör ve iletişim" },
-      { key: "r_travel", type: "rating", label: "Otel ve transfer" }, { key: "comment", type: "textarea", label: "Bize iletmek istediğiniz bir şey var mı?" },
+      { key: "rTreat", type: "rating", label: "Tedavi ve sonuç" }, { key: "rCoord", type: "rating", label: "Koordinatör ve iletişim" },
+      { key: "rTravel", type: "rating", label: "Otel ve transfer" }, { key: "comment", type: "textarea", label: "Bize iletmek istediğiniz bir şey var mı?" },
     ] },
 ];
 

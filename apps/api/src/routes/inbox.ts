@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
 import { config, meta } from "../config.ts";
-import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { encrypt, decrypt } from "../lib/crypto.ts";
 import { wa, verifyMetaSignature, parseWebhook, inWindow, WaError } from "../services/whatsapp.ts";
@@ -101,7 +101,7 @@ export function inboxRoutes(app: FastifyInstance) {
   app.get("/api/inbox/accounts", async (req) => { const c = need(ctx(req), "inbox.use"); return withClinic(c.clinicId, (tx) => tx`select id, channel, name, phone, external_id, waba_id, config, status, last_error, last_webhook_at, created_at from channel_accounts where clinic_id = ${c.clinicId} order by created_at`); });
   app.patch("/api/inbox/accounts/:id", async (req) => {
     const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string };
-    const b = parse(z.object({ name: z.string().max(80), config: z.record(z.string(), z.unknown()), status: z.enum(["connected", "disconnected"]) }).partial(), req.body);
+    const b = parsePatch(z.object({ name: z.string().max(80), config: z.record(z.string(), z.unknown()), status: z.enum(["connected", "disconnected"]) }).partial(), req.body);
     await withClinic(c.clinicId, async (tx) => { if (b.name) await tx`update channel_accounts set name = ${b.name} where id = ${id}`; if (b.config) await tx`update channel_accounts set config = config || ${tx.json(b.config as never)} where id = ${id}`; if (b.status) await tx`update channel_accounts set status = ${b.status} where id = ${id}`; });
     return { ok: true };
   });
@@ -130,7 +130,7 @@ export function inboxRoutes(app: FastifyInstance) {
   });
   app.patch("/api/inbox/conversations/:id", async (req) => {
     const c = need(ctx(req), "inbox.use"); const { id } = req.params as { id: string };
-    const b = parse(z.object({ assigneeId: z.uuid().nullable(), status: z.enum(["open", "pending", "closed"]), starred: z.boolean(), leadId: z.uuid().nullable() }).partial(), req.body);
+    const b = parsePatch(z.object({ assigneeId: z.uuid().nullable(), status: z.enum(["open", "pending", "closed"]), starred: z.boolean(), leadId: z.uuid().nullable() }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries({ assigneeId: "assignee_id", status: "status", starred: "starred", leadId: "lead_id" })) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];
       if (b.leadId) { const [l] = await tx`select patient_id from leads where id = ${b.leadId}`; if (l) set.patient_id = l.patientId; }

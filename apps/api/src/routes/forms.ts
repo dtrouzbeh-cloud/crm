@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError, ipOf } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, ipOf } from "../http.ts";
 import { randomToken, sha256, encrypt, decrypt } from "../lib/crypto.ts";
 import { audit, emit } from "../services/audit.ts";
 import { storage, signFile } from "../services/storage.ts";
@@ -12,7 +12,7 @@ import { seedClinicForms } from "../services/forms-seed.ts";
 import { config } from "../config.ts";
 
 const FIELD = z.object({
-  key: z.string().regex(/^[a-z0-9_]{1,40}$/), type: z.enum(["heading", "text", "textarea", "number", "date", "yesno", "choice", "multi", "checkbox", "nps", "rating"]),
+  key: z.string().regex(/^[a-zA-Z0-9_]{1,40}$/), type: z.enum(["heading", "text", "textarea", "number", "date", "yesno", "choice", "multi", "checkbox", "nps", "rating"]),
   label: z.string().min(1).max(500), options: z.array(z.string().max(200)).max(30).optional(), required: z.boolean().optional(),
   flag: z.string().max(30).optional(), map: z.enum(["age", "medications", "allergies", "notes"]).optional(),
 });
@@ -77,7 +77,7 @@ export function formRoutes(app: FastifyInstance) {
     });
   });
   app.patch("/api/forms/templates/:id", async (req) => {
-    const c = need(ctx(req), "settings.manage"); const { id } = req.params as { id: string }; const b = parse(TEMPLATE.partial(), req.body);
+    const c = need(ctx(req), "settings.manage"); const { id } = req.params as { id: string }; const b = parsePatch(TEMPLATE.partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const [cur] = await tx`select * from form_templates where id = ${id}`; if (!cur) throw notFound("Şablon");
       const contentChanged = b.title !== undefined || b.body !== undefined || b.fields !== undefined || b.requireSignature !== undefined;

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
-import { ctx, parse, notFound } from "../http.ts";
+import { ctx, parse, parsePatch, notFound } from "../http.ts";
 import { audit } from "../services/audit.ts";
 
 export function taskRoutes(app: FastifyInstance) {
@@ -49,7 +49,7 @@ export function taskRoutes(app: FastifyInstance) {
   app.patch("/api/tasks/:id", async (req) => {
     const c = ctx(req);
     const { id } = req.params as { id: string };
-    const b = parse(body.partial().extend({ done: z.boolean().optional(), snoozeMinutes: z.number().int().min(5).max(60 * 24 * 30).optional() }), req.body);
+    const b = parsePatch(body.partial().extend({ done: z.boolean().optional(), snoozeMinutes: z.number().int().min(5).max(60 * 24 * 30).optional() }), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const set: Record<string, unknown> = {};
       for (const [k, col] of Object.entries({ title: "title", description: "description", type: "type", priority: "priority", dueAt: "due_at", assigneeId: "assignee_id" }))

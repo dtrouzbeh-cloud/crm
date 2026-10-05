@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError, forbidden, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, forbidden, type Ctx } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { invoiceTotals, nextInvoiceNumber, linesFromDeal, type InvLine } from "../services/finance.ts";
 import { randomToken } from "../lib/crypto.ts";
@@ -56,7 +56,7 @@ export function financeRoutes(app: FastifyInstance) {
     });
   });
   app.patch("/api/partners/:id", async (req) => {
-    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parse(PARTNER.partial(), req.body);
+    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parsePatch(PARTNER.partial(), req.body);
     const map: Record<string, string> = { name: "name", type: "type", email: "email", phone: "phone", country: "country", commissionBps: "commission_bps", refCode: "ref_code", active: "active", notes: "notes" };
     const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries(map)) if ((b as any)[k] !== undefined) set[col] = (b as any)[k] === "" ? null : (b as any)[k];
     return withClinic(c.clinicId, async (tx) => {
@@ -79,7 +79,7 @@ export function financeRoutes(app: FastifyInstance) {
     });
   });
   app.patch("/api/finance/commission-rules/:id", async (req) => {
-    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parse(RULE.partial(), req.body);
+    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parsePatch(RULE.partial(), req.body);
     const map: Record<string, string> = { name: "name", recipient: "recipient", userId: "user_id", role: "role", rateBps: "rate_bps", source: "source", active: "active" };
     const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries(map)) if ((b as any)[k] !== undefined) set[col] = (b as any)[k] === "" ? null : (b as any)[k];
     return withClinic(c.clinicId, async (tx) => { if (Object.keys(set).length) await tx`update commission_rules set ${tx(set as never)} where id = ${id}`; await audit(tx, c, "commission_rule.update", "commission_rule", id, set); return { ok: true }; });
@@ -147,7 +147,7 @@ export function financeRoutes(app: FastifyInstance) {
     });
   });
   app.patch("/api/finance/expenses/:id", async (req) => {
-    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parse(EXP.partial(), req.body);
+    const c = need(ctx(req), "finance.manage"); const { id } = req.params as { id: string }; const b = parsePatch(EXP.partial(), req.body);
     const map: Record<string, string> = { category: "category", vendor: "vendor", description: "description", amountMinor: "amount_minor", currency: "currency", spentOn: "spent_on", dealId: "deal_id", fileId: "file_id" };
     const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries(map)) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];
     return withClinic(c.clinicId, async (tx) => { if (Object.keys(set).length) await tx`update expenses set ${tx(set as never)} where id = ${id}`; await audit(tx, c, "expense.update", "expense", id, set); return { ok: true }; });

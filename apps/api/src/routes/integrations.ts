@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
 import { config, meta } from "../config.ts";
-import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { randomToken, sha256, encrypt, decrypt } from "../lib/crypto.ts";
 import { mapToLead } from "../services/mapping.ts";
@@ -83,7 +83,7 @@ export function integrationRoutes(app: FastifyInstance) {
     await withClinic(c.clinicId, async (tx) => { await tx`insert into webhook_endpoints (clinic_id, url, events, secret) values (${c.clinicId}, ${b.url}, ${b.events}, ${secret})`; await audit(tx, c, "webhook.create", "webhook", null, b); });
     return { secret };
   });
-  app.patch("/api/integrations/webhooks/:id", async (req) => { const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string }; const b = parse(z.object({ active: z.boolean(), events: z.array(z.string()) }).partial(), req.body);
+  app.patch("/api/integrations/webhooks/:id", async (req) => { const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string }; const b = parsePatch(z.object({ active: z.boolean(), events: z.array(z.string()) }).partial(), req.body);
     await withClinic(c.clinicId, async (tx) => { if (b.active !== undefined) await tx`update webhook_endpoints set active = ${b.active}, failures = 0 where id = ${id}`; if (b.events) await tx`update webhook_endpoints set events = ${b.events} where id = ${id}`; }); return { ok: true }; });
   app.delete("/api/integrations/webhooks/:id", async (req) => { const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string }; await withClinic(c.clinicId, (tx) => tx`delete from webhook_endpoints where id = ${id}`); return { ok: true }; });
   app.post("/api/integrations/webhooks/:id/test", async (req) => {
@@ -109,7 +109,7 @@ export function integrationRoutes(app: FastifyInstance) {
   });
   app.patch("/api/integrations/:id", async (req) => {
     const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string };
-    const b = parse(z.object({ name: z.string().max(80), config: z.record(z.string(), z.unknown()), status: z.enum(["configured", "connected", "healthy", "error", "disabled"]) }).partial(), req.body);
+    const b = parsePatch(z.object({ name: z.string().max(80), config: z.record(z.string(), z.unknown()), status: z.enum(["configured", "connected", "healthy", "error", "disabled"]) }).partial(), req.body);
     await withClinic(c.clinicId, async (tx) => { if (b.name) await tx`update integrations set name = ${b.name} where id = ${id}`; if (b.config) await tx`update integrations set config = config || ${tx.json(b.config as never)} where id = ${id}`; if (b.status) await tx`update integrations set status = ${b.status} where id = ${id}`; });
     return { ok: true };
   });

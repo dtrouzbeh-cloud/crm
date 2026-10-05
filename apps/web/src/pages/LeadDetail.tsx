@@ -11,6 +11,7 @@ import { LANG_NAMES } from "@dentaflow/core/i18n";
 import { eventText } from "./Dashboard.tsx";
 import { TaskRow, NewTaskDrawer } from "./Tasks.tsx";
 import { FormsCard } from "../components/FormsCard.tsx";
+import { CustomFieldsCard } from "./settings/Fields.tsx";
 
 const MED = ["diabetes", "anticoag", "bisph", "pregnant", "chemo", "smoker", "heart", "allergy"];
 
@@ -61,6 +62,7 @@ export default function LeadDetail() {
           <Field k="interest" label={t("interest")} /><Field k="budget" label={t("budget")} /><Field k="travelWindow" label={t("travel_window")} /><Field k="campaign" label="Kampanya" />
           <label className="f" style={{ gridColumn: "1/-1" }}>{t("issue")}<textarea className="inp" defaultValue={l.issue ?? ""} disabled={!can("lead.write")} onBlur={(e) => e.target.value !== (l.issue ?? "") && save({ issue: e.target.value })} /></label>
         </div></div>
+        <CustomFieldsCard values={l.custom ?? {}} editable={can("lead.write")} onSave={(cf) => save({ custom: cf })} />
         {med !== undefined && <MedicalCard med={med} onSave={saveMed} editable={can("lead.write") && me?.perms?.["field.medical"] === "show"} />}
         <div className="card"><div className="hd"><h2 className="grow">{t("timeline")}</h2></div><div className="bd col">
           {can("lead.write") && <div className="col" style={{ gap: 6 }}><div className="seg" style={{ alignSelf: "flex-start" }}>{["note", "call", "whatsapp", "email", "meeting"].map((x) => <button key={x} className={evType === x ? "on" : ""} onClick={() => setEvType(x)}>{t("ev_" + x)}</button>)}</div>

@@ -7,6 +7,7 @@ import { PageHead, Empty, Drawer, toast, toastErr, Avatar, Spinner } from "../co
 import { Icon } from "../components/Icon.tsx";
 import { useMe, useCan } from "../lib/auth.ts";
 import { LEAD_STAGES, STAGE_COL, StageBadge, stageLabel, TEMP, flag, FLAGS } from "../lib/format.tsx";
+import { FilterBar, SavedViews, filterCount, filterParams, useCustomFields, cfLabel, type LeadFilter } from "../components/LeadFilters.tsx";
 import { LANG_NAMES } from "@dentaflow/core/i18n";
 import ImportModal from "./ImportModal.tsx";
 
@@ -18,8 +19,14 @@ export default function Leads() {
   const [q, setQ] = useState(""); const [dq, setDq] = useState(""); const [page, setPage] = useState(0); const [adding, setAdding] = useState(false); const [importing, setImporting] = useState(false);
   useEffect(() => { const h = setTimeout(() => { setDq(q); setPage(0); }, 250); return () => clearTimeout(h); }, [q]);
   useEffect(() => localStorage.setItem("df_leadview", view), [view]);
+  const [filters, setFilters] = useState<LeadFilter>(() => { try { return JSON.parse(sessionStorage.getItem("df_leadfilters") ?? "{}"); } catch { return {}; } });
+  const [showF, setShowF] = useState(() => filterCount(filters) > 0);
+  useEffect(() => { try { sessionStorage.setItem("df_leadfilters", JSON.stringify(filters)); } catch { /* yok */ } setPage(0); }, [filters]);
+  const { data: cfs } = useCustomFields(); const listCfs = (cfs ?? []).filter((f) => f.showInList);
+  const { lang } = useT();
   const isStage = LEAD_STAGES.includes(tab);
-  const params = view === "kanban" ? { view: "all", q: dq, limit: 200 } : { view: isStage ? "all" : tab, stage: isStage ? tab : undefined, q: dq, limit: 50, offset: page * 50 };
+  const fp = filterParams(filters);
+  const params = view === "kanban" ? { view: "all", q: dq, limit: 200, ...fp } : { view: isStage ? "all" : tab, stage: isStage ? tab : undefined, q: dq, limit: 50, offset: page * 50, ...fp };
   const { data, isLoading } = useQuery({ queryKey: ["leads", params], queryFn: () => get("/api/leads" + qs(params)), placeholderData: keepPreviousData });
   const { data: stats } = useQuery({ queryKey: ["leadstats"], queryFn: () => get<Record<string, number>>("/api/leads/stats") });
   const qc = useQueryClient();
@@ -33,17 +40,22 @@ export default function Leads() {
     <PageHead title={t("nav_leads")} sub={t("leads_sub", { n: data?.total ?? "…" })} actions={<>
       <input className="inp" placeholder={t("filter_ph")} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />
       <div className="seg"><button className={view === "list" ? "on" : ""} onClick={() => setView("list")} title={t("list")}><Icon n="list" /></button><button className={view === "kanban" ? "on" : ""} onClick={() => setView("kanban")} title="Kanban"><Icon n="kanban" /></button></div>
+      <button className={"btn" + (filterCount(filters) ? " pri" : "")} onClick={() => setShowF(!showF)}><Icon n="search" />{t("filters")}{filterCount(filters) > 0 && <span className="bdg n" style={{ background: "#fff", color: "var(--brand)" }}>{filterCount(filters)}</span>}</button>
+      {can("lead.write") && <Link href="/leads/duplicates" className="btn ghost" title={t("duplicates")}><Icon n="users" /></Link>}
+      {can("lead.export") && <a className="btn ghost" href="/api/leads/export.csv" title="CSV"><Icon n="download" /></a>}
       {can("lead.import") && <button className="btn" onClick={() => setImporting(true)}><Icon n="upload" />{t("import")}</button>}
       {can("lead.write") && <button className="btn pri" onClick={() => setAdding(true)}><Icon n="plus" />{t("new_lead")}</button>}</>} />
+    <div style={{ marginBottom: 10 }}><SavedViews current={filters} tab={tab} onApply={(f, vt) => { setFilters(f); setShowF(filterCount(f) > 0); if (vt) setTab(vt); }} /></div>
+    {showF && <div className="card" style={{ marginBottom: 10, overflow: "hidden" }}><FilterBar value={filters} onChange={setFilters} /></div>}
     {view === "kanban" ? <Kanban items={data?.items ?? []} onMove={moveStage} /> :
       <div className="card"><div className="tabs" style={{ padding: "0 8px" }}>
         {[["active", active], ["mine", null], ["all", null], ...LEAD_STAGES.map((s) => [s, stats?.[s] ?? 0])].map(([k, n]) =>
           <button key={k as string} className={tab === k ? "on" : ""} onClick={() => { setTab(k as string); setPage(0); }}>{LEAD_STAGES.includes(k as string) ? stageLabel(t, k as string) : t("lt_" + k)}{n != null && <span className="bdg">{n as number}</span>}</button>)}</div>
-        {isLoading ? <Spinner /> : data?.items?.length ? <div className="twrap"><table className="tbl"><thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("country")}</th><th>{t("status")}</th><th>{t("source")}</th><th>{t("temp")}</th><th>{t("owner")}</th><th>{t("last_act")}</th><th /></tr></thead><tbody>
+        {isLoading ? <Spinner /> : data?.items?.length ? <div className="twrap"><table className="tbl"><thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("country")}</th><th>{t("status")}</th><th>{t("source")}</th><th>{t("temp")}</th>{listCfs.map((f) => <th key={f.id}>{cfLabel(f, lang)}</th>)}<th>{t("owner")}</th><th>{t("last_act")}</th><th /></tr></thead><tbody>
           {data.items.map((l: any) => <tr key={l.id} className="click" onClick={() => nav(`/leads/${l.id}`)}>
             <td><div className="row"><Avatar name={l.fullName} /><div><div style={{ fontWeight: 600 }}>{l.fullName} {l.overdueTasks > 0 && <span className="bdg err" title={t("g_overdue")}>{l.overdueTasks}</span>}</div><div className="tiny muted">#{l.number} · {l.email ?? ""}</div></div></div></td>
             <td className="num small">{l.phone}</td><td>{flag(l.country)} <span className="small muted">{l.country}</span></td><td><StageBadge s={l.stage} /></td>
-            <td className="small">{t("src_" + l.source)}{l.campaign && <div className="tiny muted">{l.campaign}</div>}</td><td>{TEMP[l.temperature]}</td><td>{l.ownerName ? <Avatar name={l.ownerName} sm /> : <span className="faint">—</span>}</td>
+            <td className="small">{t("src_" + l.source)}{l.campaign && <div className="tiny muted">{l.campaign}</div>}</td><td>{TEMP[l.temperature]}</td>{listCfs.map((f) => { const v = l.custom?.[f.key]; return <td key={f.id} className="small">{v === true ? "✓" : v === false ? "—" : Array.isArray(v) ? v.join(", ") : v ?? ""}</td>; })}<td>{l.ownerName ? <Avatar name={l.ownerName} sm /> : <span className="faint">—</span>}</td>
             <td className="small muted">{rel(l.lastActivityAt)}</td>
             <td className="r" onClick={(e) => e.stopPropagation()}>{l.phone && !l.phone.includes("•") && <div className="row end" style={{ gap: 4 }}>
               <a className="btn sm icon ghost" href={`tel:${l.phone}`} title={t("call")}><Icon n="phone" /></a>

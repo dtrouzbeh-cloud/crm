@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
-import { ctx, need, parse, notFound, HttpError, type Ctx } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound, HttpError, type Ctx } from "../http.ts";
 import { audit, emit } from "../services/audit.ts";
 import { loadCatalog } from "../services/catalog.ts";
 import { checkRules, suggestPlan, makeOption, type PlanItem, type Situation } from "@dentaflow/core/engine";
@@ -93,7 +93,7 @@ export function caseRoutes(app: FastifyInstance) {
   app.patch("/api/cases/:id", async (req) => {
     const c = need(ctx(req), "case.write");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ dentistId: z.uuid().nullable(), ownerId: z.uuid().nullable(), dentistNote: z.string().max(4000).nullable(), step: z.number().int().min(1).max(4), status: z.enum(["awaiting_info", "pool", "canceled"]) }).partial(), req.body);
+    const b = parsePatch(z.object({ dentistId: z.uuid().nullable(), ownerId: z.uuid().nullable(), dentistNote: z.string().max(4000).nullable(), step: z.number().int().min(1).max(4), status: z.enum(["awaiting_info", "pool", "canceled"]) }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       await getCaseOr404(tx, c, id);
       const set: Record<string, unknown> = {};

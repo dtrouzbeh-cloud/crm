@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
-import { ctx, need, parse, notFound } from "../http.ts";
+import { ctx, need, parse, parsePatch, notFound } from "../http.ts";
 import { audit } from "../services/audit.ts";
 import { invalidateCatalog, loadCatalog } from "../services/catalog.ts";
 import { seedClinicCatalog } from "../services/catalog-seed.ts";
@@ -27,7 +27,7 @@ export function catalogRoutes(app: FastifyInstance) {
   app.put("/api/catalog/treatments/:code", async (req) => {
     const c = need(ctx(req), "catalog.manage");
     const { code } = req.params as { code: string };
-    const b = parse(z.object({ category: z.string().max(30), names, descriptions: names.nullable(), unit: z.enum(["tooth", "side", "arch", "mouth", "piece"]), render: z.string().max(20),
+    const b = parsePatch(z.object({ category: z.string().max(30), names, descriptions: names.nullable(), unit: z.enum(["tooth", "side", "arch", "mouth", "piece"]), render: z.string().max(20),
       material: z.string().max(10).nullable(), visits: z.array(z.number().int().min(1).max(10)).min(1), color: z.string().max(10).nullable(), priceEur: z.number().min(0),
       prices: z.record(z.string(), z.number()).nullable(), brands: z.array(brand).nullable(), tiers: z.array(z.tuple([z.number(), z.number()])).nullable(),
       needsImplant: z.boolean(), prereq: z.object({ tx: z.string(), count: z.number() }).nullable(), active: z.boolean(), sort: z.number().int() }).partial(), req.body);
@@ -49,7 +49,7 @@ export function catalogRoutes(app: FastifyInstance) {
   app.put("/api/catalog/bundles/:code", async (req) => {
     const c = need(ctx(req), "catalog.manage");
     const { code } = req.params as { code: string };
-    const b = parse(z.object({ names, jaw: z.enum(["u", "l"]), implantTeeth: z.array(z.number().int()), crownTeeth: z.array(z.number().int()), material: z.string().nullable(), archTreatment: z.string().nullable(),
+    const b = parsePatch(z.object({ names, jaw: z.enum(["u", "l"]), implantTeeth: z.array(z.number().int()), crownTeeth: z.array(z.number().int()), material: z.string().nullable(), archTreatment: z.string().nullable(),
       minVisits: z.number().int().min(1).max(10), visits: z.array(z.number().int()).min(1), prereq: z.object({ tx: z.string(), count: z.number() }).nullable(), brands: z.array(brand).nullable(),
       priceEur: z.number().min(0), color: z.string().nullable(), active: z.boolean() }).partial(), req.body);
     const map: Record<string, string> = { jaw: "jaw", implantTeeth: "implant_teeth", crownTeeth: "crown_teeth", material: "material", archTreatment: "arch_treatment", minVisits: "min_visits", visits: "visits", priceEur: "price_eur", color: "color", active: "active" };
@@ -68,7 +68,7 @@ export function catalogRoutes(app: FastifyInstance) {
 
   app.put("/api/catalog/rules", async (req) => {
     const c = need(ctx(req), "catalog.manage");
-    const rules = parse(z.record(z.string(), z.boolean()), req.body);
+    const rules = parsePatch(z.record(z.string(), z.boolean()), req.body);
     await withClinic(c.clinicId, async (tx) => {
       await tx`update clinics set settings = jsonb_set(settings, '{rules}', ${tx.json(rules as never)}) where id = ${c.clinicId}`;
       await audit(tx, c, "catalog.rules.update", "clinic", c.clinicId, rules);
@@ -94,7 +94,7 @@ export function catalogRoutes(app: FastifyInstance) {
   app.put("/api/catalog/hotels/:id", async (req) => {
     const c = need(ctx(req), "catalog.manage");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ name: z.string().min(1).max(160), stars: z.number().int().min(1).max(5).nullable(), address: z.string().max(300).nullable(), distanceNote: z.string().max(200).nullable(), nightEur: z.number().min(0), active: z.boolean(), sort: z.number().int() }).partial(), req.body);
+    const b = parsePatch(z.object({ name: z.string().min(1).max(160), stars: z.number().int().min(1).max(5).nullable(), address: z.string().max(300).nullable(), distanceNote: z.string().max(200).nullable(), nightEur: z.number().min(0), active: z.boolean(), sort: z.number().int() }).partial(), req.body);
     const row: Record<string, unknown> = {}; for (const [k, col] of Object.entries({ name: "name", stars: "stars", address: "address", distanceNote: "distance_note", nightEur: "night_eur", active: "active", sort: "sort" })) if ((b as any)[k] !== undefined) row[col] = (b as any)[k];
     return withClinic(c.clinicId, async (tx) => {
       if (id === "new") { const [h] = await tx`insert into hotels ${tx({ clinic_id: c.clinicId, name: "Hotel", ...row } as never)} returning id`; invalidateCatalog(c.clinicId); return h; }
@@ -108,7 +108,7 @@ export function catalogRoutes(app: FastifyInstance) {
   app.put("/api/content/:id", async (req) => {
     const c = need(ctx(req), "settings.manage");
     const { id } = req.params as { id: string };
-    const b = parse(z.object({ kind: z.enum(["team", "gallery", "faq", "certificate", "testimonial", "legal"]), data: z.record(z.string(), z.unknown()), fileId: z.uuid().nullable(), active: z.boolean(), sort: z.number().int() }).partial(), req.body);
+    const b = parsePatch(z.object({ kind: z.enum(["team", "gallery", "faq", "certificate", "testimonial", "legal"]), data: z.record(z.string(), z.unknown()), fileId: z.uuid().nullable(), active: z.boolean(), sort: z.number().int() }).partial(), req.body);
     return withClinic(c.clinicId, async (tx) => {
       const row: Record<string, unknown> = {};
       if (b.kind) row.kind = b.kind; if (b.data) row.data = tx.json(b.data as never); if (b.fileId !== undefined) row.file_id = b.fileId; if (b.active !== undefined) row.active = b.active; if (b.sort !== undefined) row.sort = b.sort;

@@ -1,3 +1,4 @@
+import { cleanCustom } from "./records.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic, type Tx } from "../db.ts";
@@ -28,6 +29,7 @@ const leadInput = z.object({
   externalIds: z.record(z.string(), z.string()).optional(),
   marketingConsent: z.boolean().optional(),
   partnerId: z.uuid().optional().nullable(),
+  custom: z.record(z.string(), z.unknown()).optional(),
 });
 export type LeadInput = z.infer<typeof leadInput>;
 
@@ -59,9 +61,9 @@ export async function createLead(tx: Tx, c: Pick<Ctx, "clinicId" | "userId">, in
   let partnerId = input.partnerId ?? null;
   const ref = input.utm?.ref ?? input.utm?.ref_code ?? null;
   if (!partnerId && ref) { const [pt] = await tx`select id from partners where clinic_id = ${c.clinicId} and ref_code = ${ref} and active`; partnerId = (pt?.id as string) ?? null; }
-  const [lead] = await tx`insert into leads (clinic_id, number, patient_id, temperature, source, campaign, owner_id, interest, budget, travel_window, issue, tags, utm, external_ids, partner_id)
+  const [lead] = await tx`insert into leads (clinic_id, number, patient_id, temperature, source, campaign, owner_id, interest, budget, travel_window, issue, tags, utm, external_ids, partner_id, custom)
     values (${c.clinicId}, ${ln}, ${patient!.id}, ${input.temperature}, ${input.source}, ${input.campaign ?? null}, ${ownerId}, ${input.interest ?? null}, ${input.budget ?? null},
-            ${input.travelWindow ?? null}, ${input.issue ?? null}, ${input.tags ?? []}, ${tx.json((input.utm ?? {}) as never)}, ${tx.json((input.externalIds ?? {}) as never)}, ${partnerId})
+            ${input.travelWindow ?? null}, ${input.issue ?? null}, ${input.tags ?? []}, ${tx.json((input.utm ?? {}) as never)}, ${tx.json((input.externalIds ?? {}) as never)}, ${partnerId}, ${tx.json((input.custom ? await cleanCustom(tx, c.clinicId, "lead", input.custom) : {}) as never)})
     returning id, number`;
   await tx`insert into lead_events (clinic_id, lead_id, type, body, data, user_id) values (${c.clinicId}, ${lead!.id}, 'system', 'created', ${tx.json({ source: input.source } as never)}, ${c.userId})`;
   await audit(tx, c, "lead.create", "lead", lead!.id, { source: input.source });
@@ -96,7 +98,12 @@ export function leadRoutes(app: FastifyInstance) {
       q: z.string().max(100).optional(), view: z.enum(["active", "mine", "all", "archived"]).default("active"),
       sort: z.enum(["activity", "created", "followup"]).default("activity"),
       limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0),
+      country: z.string().max(2).optional(), language: z.string().max(5).optional(), tag: z.string().max(40).optional(), partner: z.string().optional(), campaign: z.string().max(200).optional(),
+      createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(), overdue: z.coerce.boolean().optional(), noOwner: z.coerce.boolean().optional(),
+      cf: z.string().max(2000).optional(),   // özel alan filtresi: JSON {anahtar: değer}
     }), req.query);
+    let cf: Record<string, unknown> | null = null;
+    if (q.cf) { try { cf = JSON.parse(q.cf); } catch { throw new HttpError(400, "bad_cf", "cf JSON olmalı"); } }
     return withClinic(c.clinicId, async (tx) => {
       const where = tx`
         where l.clinic_id = ${c.clinicId} ${scopeFilter(tx, c)}
@@ -107,10 +114,16 @@ export function leadRoutes(app: FastifyInstance) {
         ${q.owner ? tx`and l.owner_id = ${q.owner}` : tx``}
         ${q.source ? tx`and l.source = ${q.source}` : tx``}
         ${q.temperature ? tx`and l.temperature = ${q.temperature}` : tx``}
+        ${q.country ? tx`and p.country = ${q.country}` : tx``} ${q.language ? tx`and p.language = ${q.language}` : tx``}
+        ${q.tag ? tx`and ${q.tag} = any(l.tags)` : tx``} ${q.partner ? tx`and l.partner_id = ${q.partner}` : tx``} ${q.campaign ? tx`and l.campaign = ${q.campaign}` : tx``}
+        ${q.createdFrom ? tx`and l.created_at >= ${q.createdFrom}::date` : tx``} ${q.createdTo ? tx`and l.created_at < ${q.createdTo}::date + 1` : tx``}
+        ${q.overdue ? tx`and exists (select 1 from tasks t where t.lead_id = l.id and t.done_at is null and t.due_at < now())` : tx``}
+        ${q.noOwner ? tx`and l.owner_id is null` : tx``}
+        ${cf && Object.keys(cf).length ? tx`and l.custom @> ${tx.json(cf as never)}` : tx``}
         ${q.q ? tx`and (p.full_name ilike ${"%" + q.q + "%"} or p.phone like ${"%" + q.q.replace(/\D/g, "") + "%"} or p.email ilike ${"%" + q.q + "%"} or l.number::text = ${q.q})` : tx``}`;
       const order = q.sort === "created" ? tx`l.created_at desc` : q.sort === "followup" ? tx`l.next_follow_up_at asc nulls last` : tx`l.last_activity_at desc`;
       const rows = await tx`
-        select l.id, l.number, l.stage, l.temperature, l.source, l.campaign, l.owner_id, l.interest, l.last_activity_at, l.next_follow_up_at, l.created_at, l.tags,
+        select l.id, l.number, l.stage, l.temperature, l.source, l.campaign, l.owner_id, l.interest, l.last_activity_at, l.next_follow_up_at, l.created_at, l.tags, l.custom,
                p.id as patient_id, p.full_name, p.phone, p.email, p.country, p.language, u.name as owner_name,
                (select count(*) from tasks t where t.lead_id = l.id and t.done_at is null and t.due_at < now())::int as overdue_tasks
         from leads l join patients p on p.id = l.patient_id left join users u on u.id = l.owner_id
@@ -170,6 +183,9 @@ export function leadRoutes(app: FastifyInstance) {
       nextFollowUpAt: z.iso.datetime().optional().nullable(), archived: z.boolean().optional(),
       phoneAlt: z.string().max(40).optional().nullable(), timezone: z.string().max(60).optional().nullable(),
     }), req.body);
+    // .partial() varsayılanları yine uygular (source='manual', temperature='warm'): yalnız gövdede gelen alanlar işlenir
+    const sent = new Set(Object.keys((req.body ?? {}) as object));
+    for (const k of Object.keys(b)) if (!sent.has(k)) delete (b as Record<string, unknown>)[k];
     if (b.ownerId !== undefined) need(c, "lead.assign");
     if (b.stage === "lost" && !b.lostReason) throw new HttpError(400, "lost_reason_required", "Kayıp nedeni zorunlu");
     return withClinic(c.clinicId, async (tx) => {
@@ -182,7 +198,9 @@ export function leadRoutes(app: FastifyInstance) {
       for (const [k, col] of Object.entries(pmap)) if ((b as Record<string, unknown>)[k] !== undefined) P[col] = (b as Record<string, unknown>)[k];
       if (b.phone !== undefined) P.phone = normalizePhone(b.phone, b.country ?? cur.country);
       if (b.archived !== undefined) L.archived_at = b.archived ? new Date() : null;
-      if (Object.keys(L).length) await tx`update leads set ${tx(L as never)}, last_activity_at = now() where id = ${id}`;
+      if (b.custom) { const cc = await cleanCustom(tx, c.clinicId, "lead", b.custom); if (Object.keys(cc).length) await tx`update leads set custom = custom || ${tx.json(cc as never)} where id = ${id}`; L.__custom = cc; }
+      const L2 = { ...L }; delete L2.__custom;
+      if (Object.keys(L2).length) await tx`update leads set ${tx(L2 as never)}, last_activity_at = now() where id = ${id}`;
       if (Object.keys(P).length) await tx`update patients set ${tx(P as never)} where id = ${cur.patientId}`;
       if (b.stage && b.stage !== cur.stage) {
         await tx`insert into lead_events (clinic_id, lead_id, type, body, data, user_id) values (${c.clinicId}, ${id}, 'stage', ${cur.stage + "→" + b.stage}, ${tx.json({ from: cur.stage, to: b.stage, reason: b.lostReason ?? null } as never)}, ${c.userId})`;
