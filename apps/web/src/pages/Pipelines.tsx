@@ -11,7 +11,7 @@ import { TEMP, flag, stageLabel } from "../lib/format.tsx";
 import { RecallRulesDrawer, UpcomingRecalls } from "../components/Recalls.tsx";
 
 const pname = (p: any, lang: string) => p.name?.[lang] ?? p.name?.default ?? p.name?.en ?? p.kind;
-const dur = (s: number | null | undefined) => (s == null ? "—" : s < 3600 ? Math.round(s / 60) + " dk" : s < 86400 ? (s / 3600).toFixed(1) + " sa" : (s / 86400).toFixed(1) + " g");
+const dur = (s: number | null | undefined, t: (k: string) => string) => (s == null ? "—" : s < 3600 ? Math.round(s / 60) + " " + t("u_min") : s < 86400 ? (s / 3600).toFixed(1) + " " + t("u_hour") : (s / 86400).toFixed(1) + " " + t("u_day"));
 
 export default function Pipelines() {
   const { t, lang } = useT(); const can = useCan(); const [, nav] = useLocation(); const qc = useQueryClient();
@@ -57,8 +57,8 @@ function Board({ board, analytics, onMoved }: { board: any; analytics: any; onMo
       onDrop={(e) => { e.preventDefault(); setOver(null); if (drag && drag.stageKey !== st.key && can("lead.write")) move(drag, st); setDrag(null); }}>
       <div className="kh" style={{ flexDirection: "column", alignItems: "stretch", gap: 2 }}>
         <div className="row" style={{ gap: 6 }}><span className="dot" style={{ background: st.color }} /><span className="grow">{label(st)}</span><span className="bdg">{items.length}</span></div>
-        <div className="row tiny muted" style={{ gap: 8 }}>{st.probability > 0 && !st.isWon && <span title={t("probability")}>%{st.probability}</span>}{st.slaMinutes && <span title="SLA">⏱ {dur(st.slaMinutes * 60)}</span>}
-          {am[st.key]?.medianSeconds != null && <span title={t("median_time")}>⌀ {dur(am[st.key].medianSeconds)}</span>}<span className="grow" />{Object.entries(sum).map(([c, v]) => <span key={c}>{money(v / 100, c)}</span>)}</div></div>
+        <div className="row tiny muted" style={{ gap: 8 }}>{st.probability > 0 && !st.isWon && <span title={t("probability")}>%{st.probability}</span>}{st.slaMinutes && <span title="SLA">⏱ {dur(st.slaMinutes * 60, t)}</span>}
+          {am[st.key]?.medianSeconds != null && <span title={t("median_time")}>⌀ {dur(am[st.key].medianSeconds, t)}</span>}<span className="grow" />{Object.entries(sum).map(([c, v]) => <span key={c}>{money(v / 100, c)}</span>)}</div></div>
       <div className="kb">{items.map((it) => <div key={it.itemId ?? it.leadId} className={"kcard" + (drag && (drag.itemId ?? drag.leadId) === (it.itemId ?? it.leadId) ? " drag" : "")} draggable={can("lead.write")}
         onDragStart={() => setDrag(it)} onDragEnd={() => setDrag(null)} onClick={() => nav(`/leads/${it.leadId}`)} style={it.slaBreachedAt ? { borderColor: "var(--err)" } : undefined}>
         <div className="row"><b className="grow">{it.fullName}</b>{TEMP[it.temperature]}</div>

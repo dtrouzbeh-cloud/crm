@@ -107,7 +107,8 @@ export function aiPlusRoutes(app: FastifyInstance) {
     return r;
   });
   app.post("/api/ai/reports/qa", async (req) => {
-    const c = need(ctx(req), "team.manage"); const b = parse(z.object({ userId: z.uuid(), days: z.number().int().min(7).max(90).default(30) }), req.body); await aiReady(c.clinicId);
+    const c = ctx(req); if (!c.perms["team.manage"] && !(c.perms["reports.view"] === "all" && c.perms["lead.assign"])) throw forbidden("team.manage");
+    const b = parse(z.object({ userId: z.uuid(), days: z.number().int().min(7).max(90).default(30) }), req.body); await aiReady(c.clinicId);
     const [m] = await withClinic(c.clinicId, (tx) => tx`select 1 from memberships where user_id = ${b.userId}`); if (!m) throw notFound("Kullanıcı");
     const r = await qaReport(c.clinicId, b.userId, b.days, c.userId); if (!r) throw new HttpError(409, "no_data", "Bu temsilcinin değerlendirilecek yazışması yok");
     return r;

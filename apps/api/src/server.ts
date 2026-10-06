@@ -24,13 +24,18 @@ export async function buildServer() {
     (req as any).rawBody = body; done(null, Object.fromEntries(new URLSearchParams(body as string)));
   });
 
-  // Basit hız limiti (bellek içi, IP + yol grubu başına): kimlik uçları 20/dk, public uçlar 60/dk
+  // Basit hız limiti (bellek içi). Yalnız kaba kuvvete açık uçlar: giriş/kayıt/şifre (IP başına 20/dk) ve hasta tarafı
+  // public sayfalar (IP + belge başına 120/dk). Meta/ödeme webhook'ları ve oturum kontrolü sınırlanmaz: aynı ofisteki
+  // ekip tek IP'den çıkar, Meta da yoğun anlarda tek IP'den yüzlerce durum bildirimi gönderir.
   const hits = new Map<string, { n: number; t: number }>();
+  const WEBHOOK = /^\/api\/public\/(wa\/webhook|meta\/|in\/|pay\/|billing\/)/;
   app.addHook("onRequest", async (req) => {
-    const u = req.url;
-    const limit = u.startsWith("/api/auth/") || u.startsWith("/api/invites/") ? 20 : u.startsWith("/api/public/") ? 60 : 0;
+    const u = req.url.split("?")[0]!;
+    let limit = 0, key = "";
+    if (req.method === "POST" && (/^\/api\/auth\/(login|signup|forgot|reset|mfa)/.test(u) || u.startsWith("/api/invites/"))) { limit = 20; key = u.split("/").slice(0, 4).join("/"); }
+    else if (u.startsWith("/api/public/") && !WEBHOOK.test(u)) { limit = 120; key = u.split("/").slice(0, 5).join("/"); }
     if (!limit) return;
-    const k = `${req.ip}|${u.split("/").slice(0, 4).join("/")}`, now = Date.now();
+    const k = `${req.ip}|${key}`, now = Date.now();
     const h = hits.get(k);
     if (!h || now - h.t > 60_000) hits.set(k, { n: 1, t: now });
     else if (++h.n > limit) throw new HttpError(429, "rate_limited", "Çok fazla istek, lütfen biraz bekleyin");

@@ -1,4 +1,5 @@
 import { cleanCustom } from "./records.ts";
+import { countryFromPhone, languageForCountry } from "../lib/phone.ts";
 import { salesStageKeys } from "../services/pipelines.ts";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -46,6 +47,8 @@ export async function findDuplicatePatient(tx: Tx, clinicId: string, phone: stri
 export async function createLead(tx: Tx, c: Pick<Ctx, "clinicId" | "userId">, input: LeadInput, opts: { dedupe?: "attach" | "reject"; waId?: string | null } = {}) {
   const phone = normalizePhone(input.phone ?? null, input.country ?? undefined);
   const email = input.email ? input.email.toLowerCase() : null;
+  // ülke/dil verilmediyse telefon ön ekinden tahmin (WhatsApp, Instagram, widget lead'leri)
+  if (!input.country && phone) { const cc = countryFromPhone(phone); if (cc) input = { ...input, country: cc, language: input.language ?? languageForCountry(cc) ?? undefined }; }
   let patient: { id: string; fullName: string } | null = await findDuplicatePatient(tx, c.clinicId, phone, email, opts.waId) as { id: string; fullName: string } | null;
   if (patient && opts.dedupe === "reject") throw new HttpError(409, "duplicate", "Bu hasta zaten kayıtlı", { patientId: patient.id, name: patient.fullName });
   if (!patient) {

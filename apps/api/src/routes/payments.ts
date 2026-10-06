@@ -23,7 +23,7 @@ export async function completeIntent(intentId: string, providerRef: string | nul
     if (amountMinor != null && amountMinor !== Number(i.amountMinor)) throw new HttpError(400, "amount_mismatch", "Tutar uyuşmuyor");
     await tx`update payment_intents set status = 'succeeded', completed_at = now(), provider_ref = coalesce(${providerRef}, provider_ref) where id = ${intentId}`;
     await tx`select set_config('app.clinic_id', ${i.clinicId}, true)`;
-    await recordPayment(tx as unknown as Tx, i.clinicId, null, i.dealId, { amountMinor: Number(i.amountMinor), currency: i.currency, method: i.provider === "paypal" ? "paypal" : "card", provider: i.provider, providerRef: providerRef ?? i.id, intentId: i.id, note: i.purpose });
+    await recordPayment(tx as unknown as Tx, i.clinicId, null, i.dealId, { amountMinor: Number(i.amountMinor), currency: i.currency, method: i.provider === "paypal" ? "paypal" : i.provider === "bank_transfer" ? "bank_transfer" : "card", provider: i.provider, providerRef: providerRef ?? i.id, intentId: i.id, note: i.purpose });
     return { already: false, intent: i };
   });
 }

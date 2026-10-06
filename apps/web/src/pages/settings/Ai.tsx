@@ -10,13 +10,13 @@ import { Icon } from "../../components/Icon.tsx";
 export default function AiTab() {
   const { t } = useT(); const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["ai-agent"], queryFn: () => get("/api/ai/agent") });
+  const { data: acc } = useQuery({ queryKey: ["assess-stats"], queryFn: () => get("/api/ai/assess-stats") });   // hook'lar erken dönüşten önce
   const [d, setD] = useState<any>(null);
   if (!data) return <Spinner />;
   const a = d ?? data.agent; const set = (p: any) => setD({ ...a, ...p });
   const r = () => qc.invalidateQueries({ queryKey: ["ai-agent"] });
   const save = async () => { try { await put("/api/ai/agent", { name: a.name, mode: a.mode, channels: a.channels, persona: a.persona ?? null, instructions: a.instructions ?? null, pricePolicy: a.pricePolicy, hours: a.hours ?? {}, features: a.features ?? {}, active: true }); setD(null); r(); toast(t("saved")); } catch (e) { toastErr(e); } };
   const k = data.key;
-  const { data: acc } = useQuery({ queryKey: ["assess-stats"], queryFn: () => get("/api/ai/assess-stats") });
   return <div className="col" style={{ gap: 14 }}>
     <div className="card pad row wrap" style={{ gap: 10 }}><b>🔑 {t("ai_key")}</b>
       {k.available ? <span className="bdg ok">✓ {k.clinic ? t("ai_key_clinic") : k.mock ? t("ai_key_mock") : t("ai_key_platform")}</span> : <span className="bdg err">{t("ai_key_none")}</span>}

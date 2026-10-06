@@ -32,10 +32,10 @@ export function LiveQuotes() {
   const live = data.filter((x) => x.live), recent = data.filter((x) => !x.live).slice(0, 5);
   return <div className="card"><div className="hd"><h2 className="grow">👀 {t("quote_watchers")}</h2></div><div className="bd col" style={{ gap: 6, paddingTop: 0 }}>
     {live.map((x) => <Link key={x.quoteId} href={`/leads/${x.leadId}`} className="row" style={{ color: "inherit", gap: 8, padding: "6px 8px", borderRadius: 8, background: "var(--ok-bg)" }}>
-      <span className="bdg ok">🟢</span><div className="grow"><b className="small">{flag(x.country)} {x.fullName}</b><div className="tiny muted">{t("viewing_now")} · {x.currentSection ? t("sec_" + x.currentSection) : ""} · {Math.round(x.secondsTotal / 60)} dk</div></div>
+      <span className="bdg ok">🟢</span><div className="grow"><b className="small">{flag(x.country)} {x.fullName}</b><div className="tiny muted">{t("viewing_now")} · {x.currentSection ? t("sec_" + x.currentSection) : ""} · {Math.round(x.secondsTotal / 60)} {t("u_min")}</div></div>
       {x.phone && <a className="btn sm pri" href={`tel:${x.phone}`} onClick={(e) => e.stopPropagation()}><Icon n="phone" />{t("call")}</a>}</Link>)}
     {recent.map((x) => <Link key={x.quoteId} href={`/leads/${x.leadId}`} className="row" style={{ color: "inherit", gap: 8, padding: "4px 8px" }}>
-      <span className="tiny faint">{rel(x.lastPing)}</span><span className="small grow">{x.fullName}</span><span className="tiny muted">{x.sessions}× · {Math.round(x.secondsTotal / 60)} dk</span></Link>)}
+      <span className="tiny faint">{rel(x.lastPing)}</span><span className="small grow">{x.fullName}</span><span className="tiny muted">{x.sessions}× · {Math.round(x.secondsTotal / 60)} {t("u_min")}</span></Link>)}
   </div></div>;
 }
 
@@ -45,7 +45,7 @@ export function QuoteEngagement({ quoteId, options }: { quoteId: string; options
   if (!e) return null;
   const os = e.optionSeconds ?? {}, ss = e.sectionSeconds ?? {}; const max = Math.max(1, ...Object.values(os as Record<string, number>));
   return <div className="card pad" style={{ padding: 10 }}><div className="row" style={{ gap: 8 }}><b className="small">👀 {t("engagement")}</b>{e.live && <span className="bdg ok">🟢 {t("viewing_now")}</span>}<span className="grow" /><span className="tiny muted">{e.sessions}× · {Math.round(e.secondsTotal / 60)} dk · {rel(e.lastPing)}</span></div>
-    <div className="col" style={{ gap: 3, marginTop: 6 }}>{options.map((o, i) => <div key={i}><div className="row tiny"><span className="grow">{o}</span><span className="muted">{Math.round((os[String(i)] ?? 0) / 60)} dk</span></div><div className="prog" style={{ height: 4 }}><i style={{ width: (100 * (os[String(i)] ?? 0)) / max + "%" }} /></div></div>)}</div>
+    <div className="col" style={{ gap: 3, marginTop: 6 }}>{options.map((o, i) => <div key={i}><div className="row tiny"><span className="grow">{o}</span><span className="muted">{Math.round((os[String(i)] ?? 0) / 60)} {t("u_min")}</span></div><div className="prog" style={{ height: 4 }}><i style={{ width: (100 * (os[String(i)] ?? 0)) / max + "%" }} /></div></div>)}</div>
     <div className="row wrap tiny muted" style={{ gap: 8, marginTop: 6 }}>{Object.entries(ss as Record<string, number>).sort((a, b) => b[1] - a[1]).map(([k, v]) => <span key={k}>{t("sec_" + k)}: {Math.round(v / 60)} dk</span>)}</div>
   </div>;
 }

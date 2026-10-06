@@ -98,11 +98,12 @@ export function catalogRoutes(app: FastifyInstance) {
     const row: Record<string, unknown> = {}; for (const [k, col] of Object.entries({ name: "name", stars: "stars", address: "address", distanceNote: "distance_note", nightEur: "night_eur", active: "active", sort: "sort" })) if ((b as any)[k] !== undefined) row[col] = (b as any)[k];
     return withClinic(c.clinicId, async (tx) => {
       if (id === "new") { const [h] = await tx`insert into hotels ${tx({ clinic_id: c.clinicId, name: "Hotel", ...row } as never)} returning id`; invalidateCatalog(c.clinicId); return h; }
+      if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound("Otel");
       const [h] = await tx`update hotels set ${tx(row as never)} where id = ${id} returning id`; if (!h) throw notFound("Otel");
       invalidateCatalog(c.clinicId); return h;
     });
   });
-  app.delete("/api/catalog/hotels/:id", async (req) => { const c = need(ctx(req), "catalog.manage"); const { id } = req.params as { id: string }; await withClinic(c.clinicId, (tx) => tx`delete from hotels where id = ${id}`); return { ok: true }; });
+  app.delete("/api/catalog/hotels/:id", async (req) => { const c = need(ctx(req), "catalog.manage"); const { id } = req.params as { id: string }; if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound("Otel"); await withClinic(c.clinicId, (tx) => tx`delete from hotels where id = ${id}`); return { ok: true }; });
 
   app.get("/api/content", async (req) => { const c = ctx(req); return withClinic(c.clinicId, (tx) => tx`select * from clinic_content where clinic_id = ${c.clinicId} order by kind, sort`); });
   app.put("/api/content/:id", async (req) => {

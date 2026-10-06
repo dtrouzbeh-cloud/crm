@@ -95,9 +95,13 @@ function DepositBox({ token, q, T, M }: any) {
   const op = q.snapshot.options[q.acceptedOption ?? 0];
   const [busy, setBusy] = useState(false); const [bank, setBank] = useState<any>(null);
   const pay = async (provider: string) => { setBusy(true); try { const r = await post(`/api/public/q/${token}/checkout`, { provider }); if (r.checkoutUrl) location.href = r.checkoutUrl; else setBank(r); } catch (e) { toastErr(e); } finally { setBusy(false); } };
+  const dep = q.deposit;
+  if (dep?.paid) return <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #E3E8EC" }}><h3 style={{ margin: 0, color: "#1E7D4F" }}>✓ {T("deposit_received")}</h3><div className="small" style={{ color: "#55636D", marginTop: 4 }}>{T("paid_so_far")}: {M(dep.paidMinor / 100)}</div></div>;
+  const shown = bank ?? (dep?.pending?.provider === "bank_transfer" ? dep.pending : null);
   return <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #E3E8EC" }}>
     <h3 style={{ margin: "0 0 8px" }}>{T("pay_deposit")} · {M(op.calc.deposit)}</h3>
+    {dep?.pending && !bank && <div className="small" style={{ marginBottom: 8, color: "#8A5A00" }}>⏳ {T("transfer_pending")}</div>}
     <div className="row wrap" style={{ gap: 8 }}>{q.payment.map((p: any) => <button key={p.provider} className="btn" disabled={busy} onClick={() => pay(p.provider)}>{T("pm_" + p.provider)}</button>)}</div>
-    {bank && <div className="note" style={{ marginTop: 10 }}><div><b>{T("bank_details")}</b></div>{bank.bank?.accountName && <div>{bank.bank.accountName}</div>}{bank.bank?.iban && <div className="code">IBAN: {bank.bank.iban}</div>}{bank.bank?.swift && <div>SWIFT: {bank.bank.swift}</div>}<div>{T("reference")}: <b className="code">{bank.referenceCode}</b></div></div>}
+    {shown && <div className="note" style={{ marginTop: 10 }}><div><b>{T("bank_details")}</b></div>{shown.bank?.accountName && <div>{shown.bank.accountName}</div>}{shown.bank?.iban && <div className="code">IBAN: {shown.bank.iban}</div>}{shown.bank?.swift && <div>SWIFT: {shown.bank.swift}</div>}<div>{T("reference")}: <b className="code">{shown.referenceCode}</b></div></div>}
   </div>;
 }

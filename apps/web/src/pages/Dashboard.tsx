@@ -30,7 +30,7 @@ export default function Dashboard() {
       <div className="card kpi"><span className="l">{t("k_new")}</span><span className="v num">{data.kpi.newLeads}</span><span className="d muted">{t("last7")}</span></div>
       <div className="card kpi"><span className="l">{t("lt_active")}</span><span className="v num">{data.kpi.activeLeads}</span><span className="d"><Link href="/leads">{t("nav_leads")} →</Link></span></div>
       <div className="card kpi"><span className="l">{t("k_pool")}</span><span className="v num">{pool?.counts?.pool ?? 0}</span><span className="d"><Link href="/cases">{t("open_pool")} →</Link></span></div>
-      <div className="card kpi"><span className="l">⏱ {t("first_response")}</span><span className="v num">{data.kpi.medianResponseMin != null ? Math.round(data.kpi.medianResponseMin) + " dk" : "—"}</span><span className="d muted">medyan · 30 gün</span></div>
+      <div className="card kpi"><span className="l">⏱ {t("first_response")}</span><span className="v num">{data.kpi.medianResponseMin != null ? Math.round(data.kpi.medianResponseMin) + " " + t("u_min") : "—"}</span><span className="d muted">{t("median_30d")}</span></div>
     </div>
     <MyTarget />
     <div className="grid g2" style={{ marginBottom: 16, alignItems: "start" }}><CallList /><LiveQuotes /></div>
@@ -56,5 +56,6 @@ export function eventText(t: (k: string, p?: any) => string, e: { type: string; 
   if (e.type === "deal") return t("act_deal");
   if (e.type === "form") return `${e.data?.title ?? t("forms")}: ${e.body === "completed" ? t("fs_completed") + (e.data?.nps != null ? ` (NPS ${e.data.nps})` : "") : t("fs_sent")}`;
   if (e.type === "assign") return t("owner") + " ↺";
+  if (e.type === "payment") { const m = t("pmeth_" + e.body); const amt = e.data?.amountMinor != null ? ` · ${(Number(e.data.amountMinor) / 100).toLocaleString()} ${e.data.currency ?? ""}` : ""; return `${t("payment")}: ${m !== "pmeth_" + e.body ? m : e.body}${amt}`; }
   return `${t("ev_" + e.type) !== "ev_" + e.type ? t("ev_" + e.type) : e.type}${e.body ? ": " + e.body.slice(0, 80) : ""}`;
 }

@@ -1,7 +1,7 @@
 // Canlı satış koçu: gelen mesaj(lar) → çeviri, niyet, itiraz, duygu, taktik ve 3 alternatif cevap (tek çağrı, yapılandırılmış çıktı); ayrıca metin çevirisi
 import { ownerSql, type Tx } from "../../db.ts";
 import { complete, MODELS } from "./llm.ts";
-import { knowledge, history, trackUsage } from "./agent.ts";
+import { knowledge, history, trackUsage, otx } from "./agent.ts";
 
 export const OBJECTIONS = ["price", "fear", "trust", "timing", "distance", "quality", "competitor", "family", "health", "none"] as const;
 export const INTENTS = ["info", "price_question", "ready_to_book", "send_photos", "scheduling", "negotiation", "complaint", "aftercare", "not_interested", "other"] as const;
@@ -18,9 +18,9 @@ const COACH_TOOL = { name: "coach_output", description: "Satış koçu çıktıs
   lead: { type: "object", description: "Hastanın açıkça söylediği yeni bilgiler", properties: { interest: { type: "string" }, budget: { type: "string" }, travelWindow: { type: "string" }, temperature: { type: "string", enum: ["hot", "warm", "cold"] } } },
 } } };
 
-export async function coachConversation(clinicId: string, conversationId: string) {
-  return ownerSql.begin(async (tx0) => {
-    const tx = tx0 as unknown as Tx; await tx`select set_config('app.clinic_id', ${clinicId}, true)`;
+export async function coachConversation(clinicId: string, conversationId: string, opts: { reuseMinutes?: number } = {}) {
+  // 1) bağlamı kısa işlemde oku. AI çağrısı işlem DIŞINDA yapılır: açık işlem kilit tutar, bağlantı havuzunu tıkar ve iş kuyruğunu durdurur.
+  const pre = await otx(clinicId, async (tx) => {
     const [agent] = await tx`select * from ai_agents where clinic_id = ${clinicId} and kind = 'text'`;
     const [cv] = await tx`select lead_id from conversations where id = ${conversationId}`; if (!cv) return null;
     const [lead] = cv.leadId ? await tx`select l.id, l.stage, l.interest, l.patient_id, p.full_name, p.country, p.language from leads l join patients p on p.id = l.patient_id where l.id = ${cv.leadId}` : [null];
@@ -28,17 +28,26 @@ export async function coachConversation(clinicId: string, conversationId: string
     const msgs = await history(tx, conversationId); if (!msgs.length || msgs[msgs.length - 1]!.role !== "user") return null;
     const kb = await knowledge(tx, clinicId, agent ?? { pricePolicy: "ranges" });
     const [lastIn] = await tx`select id from messages where conversation_id = ${conversationId} and direction = 'in' order by id desc limit 1`;
-    const system = `Diş turizmi kliniğinde satış temsilcisine yardım eden deneyimli bir satış koçusun. Temsilci hastayla yazışıyor; sen yalnız temsilciye öneri verirsin, hastaya doğrudan yazmazsın.
+    // aynı hasta mesajı için yakın zamanda üretilmiş öneri varsa yeniden kullan (işçi + elle istek çakışırsa çift AI ücreti olmaz)
+    const [prev] = lastIn ? await tx`select * from conv_insights where conversation_id = ${conversationId} and message_id = ${lastIn.id} and created_at > now() - make_interval(mins => ${opts.reuseMinutes ?? 10}) order by id desc limit 1` : [];
+    return { agent, cv, lead, cLang, msgs, kb, lastIn, prev };
+  });
+  if (!pre) return null;
+  const { agent, cv, lead, cLang, msgs, kb, lastIn, prev } = pre;
+  if (prev) return { id: Number(prev.id), reused: true, lang: prev.lang, translation: prev.translation, intent: prev.intent, objection: prev.objection ?? "none", sentiment: prev.sentiment, urgency: prev.urgency, tactic: prev.tactic, suggestions: prev.suggestions };
+  const system = `Diş turizmi kliniğinde satış temsilcisine yardım eden deneyimli bir satış koçusun. Temsilci hastayla yazışıyor; sen yalnız temsilciye öneri verirsin, hastaya doğrudan yazmazsın.
 Klinik dili: ${LANG_NAME[cLang] ?? cLang}. Çeviri, taktik, etiket ve "gloss" alanlarını klinik dilinde yaz. "text" alanlarını HASTANIN YAZDIĞI DİLDE yaz.
 Üç alternatif cevap üret: (1) kısa ve net, (2) sıcak ve güven veren, (3) bir sonraki adıma (fotoğraf, ön görüşme, kapora, tarih) yönlendiren.
 KURALLAR: teşhis koyma; sonuç garanti etme; "garanti", "ağrısız", "%100" deme; kesin fiyat verme — yalnız bilgi tabanındaki fiyat kurallarına uy; bilgi tabanında olmayan şeyi uydurma. Cevaplar WhatsApp üslubunda, en fazla 3-4 cümle.
 İtiraz varsa (fiyat, korku, güven, zamanlama…) önce empati kur, sonra değeri anlat; baskı yapma.${agent?.persona ? `\nTON: ${agent.persona}` : ""}${agent?.instructions ? `\nKLİNİK TALİMATLARI: ${agent.instructions}` : ""}
 HASTA: ${lead ? `${lead.fullName}, ${lead.country ?? "-"}, aşama: ${lead.stage}, ilgi: ${lead.interest ?? "-"}` : "bilinmiyor"}
 BİLGİ TABANI:\n${kb.text}`;
-    const model = agent?.model || MODELS.agent;
-    const r = await complete(clinicId, { model, system, messages: msgs, tools: [COACH_TOOL], toolChoice: "coach_output", maxTokens: 900 });
-    await trackUsage(clinicId, "coach", model, r.usage);
-    const o = r.toolCalls[0]?.input; if (!o?.suggestions?.length) return null;
+  const model = agent?.model || MODELS.agent;
+  const r = await complete(clinicId, { model, system, messages: msgs, tools: [COACH_TOOL], toolChoice: "coach_output", maxTokens: 900 });
+  await trackUsage(clinicId, "coach", model, r.usage);
+  const o = r.toolCalls[0]?.input; if (!o?.suggestions?.length) return null;
+  // 2) sonucu kısa işlemde yaz
+  return otx(clinicId, async (tx) => {
     const [ins] = await tx`insert into conv_insights (clinic_id, conversation_id, lead_id, message_id, lang, translation, intent, objection, sentiment, urgency, tactic, suggestions)
       values (${clinicId}, ${conversationId}, ${cv.leadId}, ${lastIn?.id ?? null}, ${String(o.lang ?? "").slice(0, 5) || null}, ${o.translation || null}, ${o.intent ?? null}, ${o.objection && o.objection !== "none" ? o.objection : null}, ${o.sentiment ?? null}, ${o.urgency ?? null}, ${o.tactic ?? null}, ${tx.json(o.suggestions as never)}) returning id`;
     if (lead) {

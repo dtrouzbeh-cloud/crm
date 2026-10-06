@@ -23,8 +23,21 @@ export function publicRoutes(app: FastifyInstance) {
     const q = await quoteByToken(token);
     const [newer] = await ownerSql`select 1 from quotes where case_id = ${q.caseId} and version > ${q.version} limit 1`;
     const providers = await ownerSql`select provider, config from payment_providers where clinic_id = ${q.clinicId} and active`;
+    // kabul sonrası kapora durumu: ödendiyse tekrar ödeme istenmez; bekleyen havale varsa referans ve banka bilgisi yeniden gösterilir
+    let deposit: { minor: number; paidMinor: number; paid: boolean; pending: { provider: string; referenceCode: string | null; bank: Record<string, string> | null } | null } | null = null;
+    if (q.status === "accepted") {
+      const [d] = await ownerSql`select id, deposit_minor from deals where quote_id = ${q.id} order by created_at desc limit 1`;
+      if (d) {
+        const [paid] = await ownerSql`select coalesce(sum(amount_minor),0)::bigint as s from payments where deal_id = ${d.id}`;
+        const [pi] = await ownerSql`select provider, reference_code from payment_intents where deal_id = ${d.id} and status in ('created','pending') order by created_at desc limit 1`;
+        const bankCfg = pi?.provider === "bank_transfer" ? (providers.find((p) => p.provider === "bank_transfer")?.config ?? null) : null;
+        const isPaid = Number(paid!.s) >= Number(d.depositMinor) && Number(d.depositMinor) > 0;
+        deposit = { minor: Number(d.depositMinor), paidMinor: Number(paid!.s), paid: isPaid,
+          pending: pi && !isPaid ? { provider: pi.provider as string, referenceCode: (pi.referenceCode as string) ?? null, bank: bankCfg ? { accountName: bankCfg.accountName, iban: bankCfg.iban, swift: bankCfg.swift, bankName: bankCfg.bankName } : null } : null };
+      }
+    }
     return { id: q.id, number: q.number, version: q.version, status: q.status, validUntil: q.validUntil, snapshot: q.snapshot, response: q.response, acceptedOption: q.acceptedOption, superseded: !!newer,
-      payment: providers.map((p) => ({ provider: p.provider, currencies: p.config?.currencies ?? null })) };
+      payment: providers.map((p) => ({ provider: p.provider, currencies: p.config?.currencies ?? null })), deposit };
   });
 
   // Görüntülenme: personel önizlemesi (?staff=1 ve oturum) sayılmaz

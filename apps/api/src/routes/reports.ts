@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withClinic } from "../db.ts";
-import { ctx, need, parse } from "../http.ts";
+import { ctx, need, parse, HttpError } from "../http.ts";
 
 export function reportRoutes(app: FastifyInstance) {
   app.get("/api/reports", async (req) => {
@@ -78,7 +78,8 @@ export function salesReportRoutes(app: import("fastify").FastifyInstance) {
     });
   });
   app.put("/api/targets", async (req) => {
-    const c = need(ctx(req), "team.manage");
+    // satış müdürü de hedef koyar: ekip yönetimi ya da (tüm raporlar + lead atama) yetkisi
+    const c = ctx(req); if (!c.perms["team.manage"] && !(c.perms["reports.view"] === "all" && c.perms["lead.assign"])) throw new HttpError(403, "forbidden", "Yetki yok: team.manage");
     const b = zz.object({ userId: zz.uuid(), month: zz.iso.date(), revenueMinor: zz.number().int().min(0), deals: zz.number().int().min(0), currency: zz.string().length(3) }).parse(req.body);
     return withClinic(c.clinicId, async (tx) => {
       await tx`insert into sales_targets (clinic_id, user_id, month, revenue_minor, deals, currency) values (${c.clinicId}, ${b.userId}, date_trunc('month', ${b.month}::date)::date, ${b.revenueMinor}, ${b.deals}, ${b.currency})

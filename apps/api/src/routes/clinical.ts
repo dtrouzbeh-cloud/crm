@@ -22,6 +22,9 @@ const LAB_BUNDLE = /^(ao[46]|fp|smile|snap)_/;
 
 const LAB_ITEM = z.object({ desc: z.string().trim().min(1).max(300), teeth: z.array(z.number().int().min(11).max(48)).max(32).default([]), material: z.string().max(80).optional(), qty: z.number().int().min(1).max(64).default(1) });
 
+// şikâyet/tedavi sonrası: satış (lead.write) yanında koordinatör ve resepsiyon da kaydeder
+const canComplaint = (c: Ctx) => !!(c.perms["lead.write"] || c.perms["trip.manage"] || c.perms["appointment.manage"]);
+
 export function clinicalRoutes(app: FastifyInstance) {
   // ── laboratuvarlar ──
   app.get("/api/labs", async (req) => { const c = clinicalRead(ctx(req)); return withClinic(c.clinicId, (tx) => tx`select l.*, (select count(*)::int from lab_orders o where o.lab_id = l.id and o.status not in ('delivered','canceled')) as open_orders from labs l order by l.active desc, l.name`); });
@@ -165,7 +168,7 @@ export function clinicalRoutes(app: FastifyInstance) {
       where true ${q.status ? (q.status === "open_all" ? tx`and x.status in ('open','reviewing','in_progress')` : tx`and x.status = ${q.status}`) : tx``} ${q.leadId ? tx`and x.lead_id = ${q.leadId}` : tx``} order by x.opened_at desc limit 500`);
   });
   app.post("/api/complaints", async (req) => {
-    const c = ctx(req); if (!c.perms["lead.write"]) throw forbidden("lead.write"); const b = parse(COMP, req.body);
+    const c = ctx(req); if (!canComplaint(c)) throw forbidden("lead.write"); const b = parse(COMP, req.body);
     return withClinic(c.clinicId, async (tx) => {
       const [l] = await tx`select l.id, l.owner_id, p.full_name from leads l join patients p on p.id = l.patient_id where l.id = ${b.leadId}`; if (!l) throw notFound("Lead");
       const dealId = b.dealId ?? ((await tx`select id from deals where lead_id = ${b.leadId} order by created_at desc limit 1`)[0]?.id as string | undefined) ?? null;
@@ -185,7 +188,7 @@ export function clinicalRoutes(app: FastifyInstance) {
     });
   });
   app.patch("/api/complaints/:id", async (req) => {
-    const c = ctx(req); if (!c.perms["lead.write"]) throw forbidden("lead.write"); const { id } = req.params as { id: string };
+    const c = ctx(req); if (!canComplaint(c)) throw forbidden("lead.write"); const { id } = req.params as { id: string };
     const b = parsePatch(z.object({ status: z.enum(["open", "reviewing", "in_progress", "resolved", "rejected"]), warrantyCovered: z.boolean().nullable(), resolution: z.string().max(4000).nullable(), costMinor: z.number().int().min(0).nullable(), currency: z.string().length(3).nullable(), ownerId: z.uuid().nullable() }).partial(), req.body);
     const map: Record<string, string> = { status: "status", warrantyCovered: "warranty_covered", resolution: "resolution", costMinor: "cost_minor", currency: "currency", ownerId: "owner_id" };
     const set: Record<string, unknown> = {}; for (const [k, col] of Object.entries(map)) if ((b as any)[k] !== undefined) set[col] = (b as any)[k];

@@ -52,3 +52,12 @@ test("seçenek katmanları farklı fiyat üretir (ekonomik < önerilen < premium
   const t = [0, 1, 2].map((i) => calcOption(cat, makeOption(cat, items, 2, i, id), 2, "GBP", "en", (u) => u, (k) => k).total);
   assert.ok(t[0]! < t[1]! && t[1]! < t[2]!, t.join(" < "));
 });
+
+test("mükerrer tedavi: aynı dişe iki implant / aynı kalem iki kez / iki kalıcı kron engellenir; geçici + kalıcı kron serbest", () => {
+  // öneri alt çeneye implant koyduktan sonra elle aynı dişlere tekrar implant eklemek → 6 implant faturası (E2E'de bulundu)
+  assert.ok(codes([{ id: id(), v: 1, tx: "implant", teeth: [36, 37, 46, 47] }, { id: id(), v: 1, tx: "implant", teeth: [36, 46] }, { id: id(), v: 2, tx: "crown_imp", teeth: [36, 37, 46, 47] }]).includes("block:DUP"));
+  assert.ok(codes([{ id: id(), v: 1, b: "ao4_u" }, { id: id(), v: 1, tx: "implant", teeth: [12] }, { id: id(), v: 2, b: "fp_u" }]).includes("block:DUP"), "paket implantı + tek implant");
+  assert.ok(codes([{ id: id(), v: 1, b: "ao4_u" }, { id: id(), v: 2, b: "fp_u" }, { id: id(), v: 2, tx: "crown_zr", teeth: [11] }]).includes("block:DUP"), "paket kronu + tek kron");
+  assert.ok(!codes([{ id: id(), v: 1, tx: "crown_temp", teeth: [11] }, { id: id(), v: 2, tx: "crown_zr", teeth: [11] }]).includes("block:DUP"), "geçici + kalıcı serbest");
+  assert.ok(!codes([{ id: id(), v: 1, b: "ao4_u" }, { id: id(), v: 2, b: "fp_u" }]).includes("block:DUP"), "standart All-on-4 planı temiz");
+});

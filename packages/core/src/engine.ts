@@ -165,7 +165,7 @@ export function spansFor(cat: Catalog, situation: Situation, items: PlanItem[], 
 export type Severity = "block" | "warn" | "info";
 export interface RuleHit { sev: Severity; code: string; p: Record<string, string | number>; v?: number }
 export interface Medical { flags?: string[]; age?: number | null }
-export const BLOCK_RULES = ["B1", "B3", "B4", "B5", "C1", "C1b", "MINV", "EMPTY"];
+export const BLOCK_RULES = ["B1", "B3", "B4", "B5", "DUP", "C1", "C1b", "MINV", "EMPTY"];
 export const WARN_RULES = ["VISIT", "B6", "BRIDGE", "SINUS_NOIMP", "SINUS_LOW", "BONE", "PRESENT", "D1", "PREREQ", "M1", "M2", "M3", "M4", "M5", "M6"];
 
 export function checkRules(cat: Catalog, situation: Situation, items: PlanItem[], visits: number, med: Medical, lang = "en", jawLabel: (j: "u" | "l") => string = (j) => j): RuleHit[] {
@@ -183,6 +183,15 @@ export function checkRules(cat: Catalog, situation: Situation, items: PlanItem[]
     if ((has(t, "implant") || ["impab", "impcr"].includes(sit[t]?.s ?? "")) && has(t, "veneer")) B.B5!.push(t);
   }
   for (const [k, v] of Object.entries(B)) if (v.length) push("block", k, { teeth: v.join(", ") });
+  // DUP: aynı dişe iki implant, aynı tedavi iki kez ya da iki kalıcı kron (paket + tek kalem dahil) → çift faturalama
+  const dup: number[] = [];
+  for (const [k, evs] of Object.entries(byT)) {
+    const imp = evs.filter((e) => e.render === "implant").length;
+    const perm = evs.filter((e) => e.render === "crown" && e.mat !== "temp").length;
+    const ids = evs.filter((e) => !e.viaBundle).map((e) => e.txId);
+    if (imp > 1 || perm > 1 || ids.length !== new Set(ids).size) dup.push(+k);
+  }
+  if (dup.length) push("block", "DUP", { teeth: dup.sort((a, c) => ALL_TEETH.indexOf(a) - ALL_TEETH.indexOf(c)).join(", ") });
   const sinusT = ex.teeth.filter((e) => e.render === "sinus");
   const low = sinusT.filter((e) => jawOf(e.t) === "l").map((e) => e.t); if (low.length) push("block", "C1", { teeth: low.join(", ") });
   const ant = sinusT.filter((e) => jawOf(e.t) === "u" && !POSTERIOR_UP.includes(e.t)).map((e) => e.t); if (ant.length) push("block", "C1b", { teeth: ant.join(", ") });

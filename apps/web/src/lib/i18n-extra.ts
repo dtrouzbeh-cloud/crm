@@ -1,5 +1,8 @@
 // Uygulamaya özgü ek çeviriler (prototip sözlüğüne eklenir) — [tr, en, de, ar]
 export const EXTRA: Record<string, string[]> = {
+  src_partner: ["İş ortağı / ajans", "Partner / agency", "Partner / Agentur", "شريك / وكالة"], src_campaign: ["Kampanya", "Campaign", "Kampagne", "حملة"], src_messenger: ["Messenger", "Messenger", "Messenger", "ماسنجر"],
+  med_allergy: ["Alerji", "Allergy", "Allergie", "حساسية"], payment: ["Ödeme", "Payment", "Zahlung", "دفعة"],
+  u_min: ["dk", "min", "Min.", "د"], u_hour: ["sa", "h", "Std.", "س"], u_day: ["g", "d", "T.", "ي"], median_30d: ["medyan · 30 gün", "median · 30 days", "Median · 30 Tage", "الوسيط · 30 يوماً"],
   login_t: ["Giriş yap", "Sign in", "Anmelden", "تسجيل الدخول"], signup_t: ["Kliniğinizi oluşturun", "Create your clinic", "Klinik erstellen", "أنشئ عيادتك"],
   email: ["E-posta", "Email", "E-Mail", "البريد الإلكتروني"], password: ["Şifre", "Password", "Passwort", "كلمة المرور"], your_name: ["Adınız", "Your name", "Ihr Name", "اسمك"],
   forgot: ["Şifremi unuttum", "Forgot password?", "Passwort vergessen?", "نسيت كلمة المرور؟"], no_account: ["Hesabınız yok mu?", "No account yet?", "Noch kein Konto?", "ليس لديك حساب؟"],
@@ -88,7 +91,8 @@ export const EXTRA: Record<string, string[]> = {
   lr_other: ["Diğer", "Other", "Sonstiges", "أخرى"],
   new_rule: ["Yeni kural", "New rule", "Neue Regel", "قاعدة جديدة"],
   other_leads: ["Aynı hastanın diğer lead'leri", "Other leads of this patient", "Weitere Leads", "عملاء آخرون للمريض"],
-  pay_deposit: ["Kapora öde", "Pay deposit", "Anzahlung leisten", "ادفع العربون"],
+  pay_deposit: ["Kapora öde", "Pay deposit", "Anzahlung leisten", "ادفع العربون"], deposit_received: ["Kapora alındı — teşekkürler", "Deposit received — thank you", "Anzahlung erhalten — vielen Dank", "تم استلام العربون — شكراً"], paid_so_far: ["Şimdiye kadar ödenen", "Paid so far", "Bisher bezahlt", "المدفوع حتى الآن"],
+  transfer_pending: ["Havaleniz bekleniyor. Açıklamaya referans kodunu yazmayı unutmayın; ulaşınca onaylayacağız.", "We are waiting for your transfer. Please include the reference code; we will confirm once it arrives.", "Wir warten auf Ihre Überweisung. Bitte geben Sie den Referenzcode an; wir bestätigen nach Eingang.", "ننتظر تحويلك. يرجى كتابة رمز المرجع؛ سنؤكد عند الوصول."],
   pg_leads: ["Lead ve iletişim", "Leads & inbox", "Leads & Posteingang", "العملاء والوارد"],
   pg_clinical: ["Klinik", "Clinical", "Klinik", "سريري"],
   pg_sales: ["Satış ve para", "Sales & money", "Vertrieb & Geld", "المبيعات والمال"],
@@ -1026,7 +1030,7 @@ export const EXTRA: Record<string, string[]> = {
   ai_accuracy: ["AI ön değerlendirme doğruluğu", "AI pre-assessment accuracy", "KI-Vorbefund-Genauigkeit", "دقة التقييم الأولي"],
   apply_to_chart: ["Şemaya uygula", "Apply to chart", "In Schema übernehmen", "تطبيق على المخطط"],
   applied_to_chart: ["Şemaya uygulandı — kontrol edin", "Applied to chart — please review", "Übernommen — bitte prüfen", "طُبّق — راجع"],
-  ai_assess_disclaimer: ["Deneysel: genel yapay zeka röntgende implant/post ayrımında yanılabilir. Yalnız boş dişlere yazar; hekim onayı şarttır.", "Only fills empty teeth; dentist must confirm.", "Nur leere Zähne; Zahnarzt bestätigt.", "يملأ الأسنان الفارغة فقط؛ يؤكد الطبيب."],
+  ai_assess_disclaimer: ["Taslaktır: röntgende implant, post ve kron ayrımını hekim doğrular. Yalnız boş dişlere yazar; hekim onayı şarttır.", "Draft: the dentist verifies implants, posts and crowns on the X-ray. Only fills empty teeth; dentist approval required.", "Entwurf: Implantate, Stifte und Kronen prüft der Zahnarzt. Füllt nur leere Zähne; Freigabe durch den Zahnarzt erforderlich.", "مسودة: يتحقق الطبيب من الزرعات والأوتاد والتيجان في الأشعة. يملأ الأسنان الفارغة فقط؛ موافقة الطبيب مطلوبة."],
   objections_title: ["İtiraz dağılımı", "Objection breakdown", "Einwände", "توزيع الاعتراضات"],
   objections_hint: ["Satış koçunun yazışmalardan tespit ettiği itirazlar; ✓ kazanılan, ✕ kaybedilen", "Objections detected by the sales coach; ✓ won, ✕ lost", "Vom Coach erkannte Einwände", "اعتراضات رصدها المدرب"],
   loss_report: ["AI kayıp analizi", "AI loss analysis", "KI-Verlustanalyse", "تحليل الخسائر"],

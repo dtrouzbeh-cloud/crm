@@ -78,16 +78,21 @@ async function processOutbox(): Promise<number> {
   return evs.length;
 }
 
+const JOB_TIMEOUT_MS = Number(process.env.JOB_TIMEOUT_MS ?? 180_000);
 async function processJobs(): Promise<number> {
   const jobs = await ownerSql`update jobs set locked_at = now(), locked_by = ${workerId}, attempts = attempts + 1
     where id in (select id from jobs where done_at is null and run_at <= now() and (locked_at is null or locked_at < now() - interval '5 minutes') and attempts < max_attempts order by run_at limit 10 for update skip locked)
     returning id, clinic_id, type, payload, attempts`;
   for (const j of jobs) {
-    const h = jobHandlers[j.type as string];
+    const h = jobHandlers[j.type as string]; const t0 = Date.now();
     try {
       if (!h) throw new Error(`işleyici yok: ${j.type}`);
-      await h(j.payload as Record<string, unknown>, j.clinicId as string | null);
+      // iş başına süre sınırı: takılan bir dış çağrı tüm kuyruğu durdurmasın (kilit süresi 5 dk'dan kısa)
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([h(j.payload as Record<string, unknown>, j.clinicId as string | null),
+        new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`zaman aşımı (${JOB_TIMEOUT_MS / 1000} sn)`)), JOB_TIMEOUT_MS); })]).finally(() => clearTimeout(timer));
       await ownerSql`update jobs set done_at = now(), locked_at = null, last_error = null where id = ${j.id}`;
+      const took = Date.now() - t0; if (took > 20_000) console.warn(`yavaş iş: ${j.type} #${j.id} ${Math.round(took / 1000)} sn`);
     } catch (e) {
       const backoff = Math.min(3600, 2 ** Number(j.attempts) * 15);
       await ownerSql`update jobs set locked_at = null, last_error = ${String((e as Error).message).slice(0, 2000)}, run_at = now() + ${backoff + " seconds"}::interval where id = ${j.id}`;

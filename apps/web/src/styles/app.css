@@ -182,7 +182,9 @@ label.f>.inp{color:var(--text);font-size:14px;font-weight:400}
 .stepper a.done i{background:var(--ok-bg);color:var(--ok)}
 .stepper a.lock{opacity:.5;pointer-events:none}
 .ws{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
-@media (max-width:1180px){.ws{grid-template-columns:1fr}}
+@media (max-width:1180px){.ws{grid-template-columns:minmax(0,1fr)}}
+/* ızgara öğeleri içerik genişliğine göre taşmasın (dar ekran / tablet) */
+.grid>*,.ws>*,.ws2>*{min-width:0}
 .chartbox{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 12px 8px;position:relative;user-select:none;-webkit-user-select:none;touch-action:none}
 .chartbox svg{width:100%;height:auto;display:block}
 .chartbox [data-t]{cursor:pointer}
@@ -255,7 +257,9 @@ label.f>.inp{color:var(--text);font-size:14px;font-weight:400}
 .pp .hero{background:var(--c1);color:#fff;padding:28px 20px 70px}
 .pp .hero .in{max-width:900px;margin:0 auto}
 .pp .body{max-width:900px;margin:-48px auto 0;padding:0 16px 80px;display:flex;flex-direction:column;gap:14px}
-.pp .pc{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px}
+.pp .pc{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;min-width:0;max-width:100%;box-sizing:border-box}
+.pp .pc.doc{overflow-x:auto}
+@media (max-width:520px){.pp .pc.doc{padding:12px!important}.pp .doc table{font-size:11.5px}.pp .doc th{font-size:9.5px;letter-spacing:0;white-space:nowrap}.pp .doc td{overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}.pp .doc .tl .s{min-width:90px}}
 .pp .cd{display:flex;gap:8px}
 .pp .cd div{background:rgba(255,255,255,.16);border-radius:10px;padding:6px 10px;text-align:center;min-width:54px}
 .pp .cd b{display:block;font-size:20px}

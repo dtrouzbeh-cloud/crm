@@ -32,12 +32,13 @@ export async function knowledge(tx: Tx, clinicId: string, agent: any) {
   if (q.hotelNightEur || q.transferEur) lines.push(`Paket hizmetler: otel konaklama ve havalimanı-otel-klinik transferi organize edilir.`);
   if (agent.pricePolicy !== "none") {
     const cat = await loadCatalog(tx, clinicId);
-    const tx1 = cat.treatments.filter((t: any) => t.active && t.price > 0);
-    const byCat: Record<string, { n: string; p: number }[]> = {};
-    for (const t of tx1) (byCat[t.cat] ??= []).push({ n: tn(t.n, "tr"), p: convert(cat, t.price, cur, t.prices) });
-    lines.push(`Fiyat bilgisi (${cur}; ${agent.pricePolicy === "ranges" ? "yalnız 'başlayan fiyatlarla' aralık olarak söyle" : "aşağıdaki fiyatları söyleyebilirsin"}; kesin fiyat hekimin muayenesi/fotoğraflardan sonra hazırlanan kişisel teklifle verilir):`);
-    for (const [k, arr] of Object.entries(byCat)) lines.push(agent.pricePolicy === "ranges" ? `- ${k}: ${arr.map((a) => a.n).slice(0, 6).join(", ")} — ${Math.min(...arr.map((a) => a.p))} ${cur}'dan başlayan` : `- ${arr.map((a) => `${a.n}: ${a.p} ${cur}`).join("; ")}`);
-    if (agent.pricePolicy === "packages") for (const b of cat.bundles) lines.push(`- Paket ${tn((b as any).n, "tr")}: ${convert(cat, (b as any).price, cur, (b as any).prices)} ${cur}'dan başlayan`);
+    // her tedavinin KENDİ başlangıç fiyatı (markalıysa en ucuz marka). Kategori en düşüğü verilmez: "implant 120'den" gibi yanıltıcı cevaplara yol açar.
+    const from = (t: any) => { const bp = (t.brands ?? []).map((b: any) => Number(b.price)).filter((x: number) => x > 0); return bp.length ? Math.min(...bp) : Number(t.price); };
+    const tx1 = cat.treatments.filter((t: any) => t.active && from(t) > 0);
+    const ranges = agent.pricePolicy === "ranges";
+    lines.push(`Fiyat bilgisi (${cur}, birim başına; ${ranges ? "yalnız 'başlayan fiyat' olarak söyle" : "aşağıdaki fiyatları söyleyebilirsin"}; kesin fiyat hekimin muayenesi/fotoğraflardan sonra hazırlanan kişisel teklifle verilir. Bir tedavinin fiyatını sorulursa YALNIZ o tedavinin satırını kullan, başka kalemin fiyatını onun fiyatı gibi söyleme):`);
+    for (const t of tx1) lines.push(`- ${tn(t.n, "tr")} (${t.unit === "tooth" ? "diş başına" : t.unit === "arch" ? "çene başına" : t.unit === "side" ? "taraf başına" : t.unit === "mouth" ? "tüm ağız" : "adet"}): ${ranges ? `${convert(cat, from(t), cur, t.brands?.length ? undefined : t.prices)} ${cur}'dan başlayan` : `${convert(cat, Number(t.price), cur, t.prices)} ${cur}`}`);
+    for (const b of cat.bundles) lines.push(`- Paket ${tn((b as any).n, "tr")}: ${convert(cat, (b as any).price, cur, (b as any).prices)} ${cur}'dan başlayan (paket içeriği ve kesin fiyat kişisel plana göre değişir)`);
   }
   const faq = await tx`select data from clinic_content where active and kind in ('faq','team','certificate') order by sort limit 30`;
   for (const f of faq) { const d = f.data as any; if (d.q && d.a) lines.push(`SSS: ${pickL(d.q)} → ${pickL(d.a)}`); else if (d.name) lines.push(`Ekip/sertifika: ${pickL(d.name)}${d.title ? " — " + pickL(d.title) : ""}`); }
@@ -65,6 +66,15 @@ HASTA: ${lead ? `${lead.fullName}${lead.country ? ", " + lead.country : ""}${lea
 
 BİLGİ TABANI:
 ${kb}`;
+}
+
+/** Kısa süreli klinik bağlamlı işlem. Dış API (AI) çağrıları ASLA bunun içinde yapılmaz: açık işlem kilit tutar ve bağlantı havuzunu tıkar. */
+export function otx<T>(clinicId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return ownerSql.begin(async (t0) => { const tx = t0 as unknown as Tx; await tx`select set_config('app.clinic_id', ${clinicId}, true)`; return fn(tx); }) as Promise<T>;
+}
+/** Model son mesajın kullanıcıdan gelmesini ister; klinik son yazdıysa takip mesajı talimatı ekle */
+export function endWithUser(msgs: Msg[], note = "[Hasta henüz cevap vermedi; son mesajı klinik gönderdi. Hastaya gönderilecek kısa, nazik bir takip mesajı yaz.]"): Msg[] {
+  return msgs.length && msgs[msgs.length - 1]!.role === "assistant" ? [...msgs, { role: "user", content: note }] : msgs;
 }
 
 /** Konuşma geçmişini modele uygun role dizisine çevir (ilk mesaj kullanıcı olmalı, ardışık roller birleşir) */
@@ -131,9 +141,8 @@ export type AgentRun = { text: string; actions: { name: string; input: any; resu
 
 /** Ajanı çalıştır: konuşma (veya test mesajları) → cevap metni + yapılan işlemler */
 export async function runAgent(clinicId: string, o: { conversationId?: string | null; leadId?: string | null; testMessages?: Msg[]; purpose: string; dryRun?: boolean }): Promise<AgentRun> {
-  return ownerSql.begin(async (tx0) => {
-    const tx = tx0 as unknown as Tx;
-    await tx`select set_config('app.clinic_id', ${clinicId}, true)`;
+  // 1) bağlamı kısa bir işlemde oku
+  const pre = await otx(clinicId, async (tx) => {
     const [agent] = await tx`select * from ai_agents where clinic_id = ${clinicId} and kind = 'text'`;
     const ag = agent ?? { name: "Asistan", pricePolicy: "ranges" };
     const [cv] = o.conversationId ? await tx`select * from conversations where id = ${o.conversationId}` : [null];
@@ -141,35 +150,42 @@ export async function runAgent(clinicId: string, o: { conversationId?: string | 
     const [lead] = leadId ? await tx`select l.*, p.full_name, p.country, p.language, p.id as pid from leads l join patients p on p.id = l.patient_id where l.id = ${leadId}` : [null];
     const kb = await knowledge(tx, clinicId, ag);
     const msgs = o.testMessages ?? (o.conversationId ? await history(tx, o.conversationId) : []);
-    if (!msgs.length) return { text: "", actions: [], handedOff: false };
-    let session: any = o.conversationId && !o.dryRun ? (await tx`select * from ai_sessions where conversation_id = ${o.conversationId} and status = 'active'`)[0] : null;
-    if (!session && o.conversationId && !o.dryRun) session = (await tx`insert into ai_sessions (clinic_id, agent_id, conversation_id, lead_id) values (${clinicId}, ${agent?.id ?? null}, ${o.conversationId}, ${leadId}) returning *`)[0];
-    const model = ag.model || MODELS.agent; const system = systemPrompt(ag, kb.text, lead);
-    const tools = o.dryRun ? TOOLS.filter((t) => t.name !== "handoff" || true) : TOOLS;
-    const actions: AgentRun["actions"] = []; let handedOff = false; let text = ""; const convo: Msg[] = [...msgs];
-    for (let round = 0; round < 4; round++) {
-      const r = await complete(clinicId, { model, system, messages: convo, tools, maxTokens: 600 });
-      await trackUsage(clinicId, o.purpose, model, r.usage);
-      if (r.text) text = r.text;
-      if (!r.toolCalls.length) break;
-      convo.push({ role: "assistant", content: r.raw });
-      const results: any[] = [];
-      for (const tc of r.toolCalls) {
-        const res = o.dryRun ? "(test modu — işlem yapılmadı)" : await runTool(tx, { clinicId, lead: lead ? { ...lead, patientId: lead.pid } : null, conversationId: o.conversationId ?? null, sessionId: session?.id ?? null }, tc.name, tc.input);
-        actions.push({ name: tc.name, input: tc.input, result: res }); if (tc.name === "handoff") handedOff = true;
-        results.push({ type: "tool_result", tool_use_id: tc.id, content: res });
-      }
-      convo.push({ role: "user", content: results });
+    let session: any = null;
+    if (msgs.length && o.conversationId && !o.dryRun) {
+      session = (await tx`select * from ai_sessions where conversation_id = ${o.conversationId} and status = 'active'`)[0] ?? null;
+      if (!session) session = (await tx`insert into ai_sessions (clinic_id, agent_id, conversation_id, lead_id) values (${clinicId}, ${agent?.id ?? null}, ${o.conversationId}, ${leadId}) returning *`)[0];
     }
-    // ilk AI mesajında şeffaflık beyanı (AB Yapay Zekâ Yasası)
-    if (text && session && !session.disclosed) {
+    return { ag, lead, kb, msgs, session };
+  });
+  const { ag, lead, kb, msgs, session } = pre;
+  if (!msgs.length) return { text: "", actions: [], handedOff: false };
+  // 2) model döngüsü işlem dışında; her araç kendi kısa işleminde
+  const model = ag.model || MODELS.agent; const system = systemPrompt(ag, kb.text, lead);
+  const actions: AgentRun["actions"] = []; let handedOff = false; let text = ""; const convo: Msg[] = endWithUser([...msgs]);
+  for (let round = 0; round < 4; round++) {
+    const r = await complete(clinicId, { model, system, messages: convo, tools: TOOLS, maxTokens: 600 });
+    await trackUsage(clinicId, o.purpose, model, r.usage);
+    if (r.text) text = r.text;
+    if (!r.toolCalls.length) break;
+    convo.push({ role: "assistant", content: r.raw });
+    const results: any[] = [];
+    for (const tc of r.toolCalls) {
+      const res = o.dryRun ? "(test modu — işlem yapılmadı)" : await otx(clinicId, (tx) => runTool(tx, { clinicId, lead: lead ? { ...lead, patientId: lead.pid } : null, conversationId: o.conversationId ?? null, sessionId: session?.id ?? null }, tc.name, tc.input));
+      actions.push({ name: tc.name, input: tc.input, result: res }); if (tc.name === "handoff") handedOff = true;
+      results.push({ type: "tool_result", tool_use_id: tc.id, content: res });
+    }
+    convo.push({ role: "user", content: results });
+  }
+  // 3) oturum güncellemesi; ilk AI mesajında şeffaflık beyanı (AB Yapay Zekâ Yasası)
+  if (session) await otx(clinicId, async (tx) => {
+    if (text && !session.disclosed) {
       const lang = lead?.language && DISCLOSE[lead.language] ? lead.language : /[ğüşıöç]/i.test(JSON.stringify(msgs)) ? "tr" : "en";
       text = `${text}\n\n${DISCLOSE[lang]!.replace("{clinic}", kb.clinic.name as string)}`;
       await tx`update ai_sessions set disclosed = true where id = ${session.id}`;
     }
-    if (session) await tx`update ai_sessions set turns = turns + 1, updated_at = now() where id = ${session.id}`;
-    return { text, actions, handedOff };
+    await tx`update ai_sessions set turns = turns + 1, updated_at = now() where id = ${session.id}`;
   });
+  return { text, actions, handedOff };
 }
 
 /** Gelen mesajda AI cevap versin mi? */
