@@ -24,12 +24,19 @@ export async function aiAvailable(clinicId: string) { return isMock() || !!(awai
 export async function complete(clinicId: string, o: { model: string; system: string; messages: Msg[]; tools?: Tool[]; maxTokens?: number; toolChoice?: string }): Promise<LlmResult> {
   if (isMock()) return mock(o);
   const key = await apiKeyFor(clinicId); if (!key) throw new Error("ai_key_missing");
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: o.model, max_tokens: o.maxTokens ?? 800, system: o.system, messages: o.messages, ...(o.tools?.length ? { tools: o.tools } : {}), ...(o.toolChoice ? { tool_choice: { type: "tool", name: o.toolChoice } } : {}) }),
-    signal: AbortSignal.timeout(90_000),
-  });
-  const j: any = await r.json().catch(() => ({}));
+  const call = async (forced: boolean) => {
+    // bazı modeller zorunlu araç seçimini ("tool"/"any") desteklemez → "auto" + sistem talimatıyla aynı sonuca yaklaş
+    const system = !forced && o.toolChoice ? `${o.system}\n\nIMPORTANT: You MUST respond by calling the "${o.toolChoice}" tool exactly once, with all required fields. Do not answer in plain text.` : o.system;
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: o.model, max_tokens: Math.max(o.maxTokens ?? 800, 4096), system, messages: o.messages, ...(o.tools?.length ? { tools: o.tools } : {}), ...(o.toolChoice ? { tool_choice: forced ? { type: "tool", name: o.toolChoice } : { type: "auto" } } : {}) }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    const j: any = await r.json().catch(() => ({}));
+    return { r, j };
+  };
+  let { r, j } = await call(true);
+  if (r.status === 400 && o.toolChoice && /tool_choice/i.test(j?.error?.message ?? "")) ({ r, j } = await call(false));
   if (!r.ok) throw new Error(`ai_http_${r.status}: ${j?.error?.message ?? ""}`.slice(0, 300));
   const blocks = (j.content ?? []) as any[];
   return { text: blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim(), toolCalls: blocks.filter((b) => b.type === "tool_use").map((b) => ({ id: b.id, name: b.name, input: b.input })),

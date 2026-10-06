@@ -10,6 +10,11 @@ const LANG: Record<string, string> = { tr: "Türkçe", en: "English", de: "Deuts
 const clinicLang = async (clinicId: string) => ((await ownerSql`select default_language from clinics where id = ${clinicId}`)[0]?.defaultLanguage as string) ?? "tr";
 
 // ── 1) Fotoğraf / röntgenden ön değerlendirme ──
+const STATUS = ["missing", "root", "caries", "crown", "bridge", "pontic", "impcr", "rct", "comp", "amalg", "impacted", "veneer", "other"];
+const STATUS_RX: [RegExp, string][] = [[/implant.*(kron|crown)|impcr/i, "impcr"], [/pontik|pontic|gövde|köprü gövdesi/i, "pontic"], [/dişsiz|eksik|missing|edentul|çekilmiş|yok/i, "missing"], [/kök artığı|kök kalıntısı|root (rest|remnant|fragment)|^root$/i, "root"],
+  [/gömülü|impacted/i, "impacted"], [/çürük|caries|karies/i, "caries"], [/veneer|lamina/i, "veneer"], [/amalgam|amalg/i, "amalg"], [/kompozit|composite|dolgu|filling|^comp$/i, "comp"], [/kanal|rct|endodont|root canal|post/i, "rct"], [/köprü|bridge/i, "bridge"], [/kron|crown|kuron|restorasyon/i, "crown"], [/mevcut|sağlam|normal|intact|sound/i, ""], [/./, "other"]];
+const normStatus = (s: string) => { const t = s.trim(); if (STATUS.includes(t)) return t; for (const [rx, v] of STATUS_RX) if (rx.test(t)) return v; return "other"; };
+
 const ASSESS_TOOL = { name: "assess_output", description: "Ön değerlendirme taslağı", input_schema: { type: "object", required: ["summary", "findings", "confidence", "image_quality"], properties: {
   summary: { type: "string" }, image_quality: { type: "string", enum: ["good", "ok", "poor"] }, confidence: { type: "string", enum: ["low", "medium", "high"] },
   findings: { type: "array", maxItems: 32, items: { type: "object", required: ["tooth", "status"], properties: { tooth: { type: "integer", description: "FDI numarası (11–48)" },
@@ -24,14 +29,18 @@ export async function assessCase(clinicId: string, caseId: string, userId: strin
   for (const f of files) { const buf = await storage.get(f.storageKey as string); content.push({ type: "text", text: f.kind === "xray" ? "Röntgen:" : "Ağız içi/gülüş fotoğrafı:" }, { type: "image", source: { type: "base64", media_type: f.mime, data: buf.toString("base64") } }); }
   content.push({ type: "text", text: "Bu görüntülere göre ön değerlendirme taslağını hazırla." });
   const model = MODELS.agent;
-  const r = await complete(clinicId, { model, maxTokens: 1500, tools: [ASSESS_TOOL], toolChoice: "assess_output", messages: [{ role: "user", content }],
+  const r = await complete(clinicId, { model, maxTokens: 8000, tools: [ASSESS_TOOL], toolChoice: "assess_output", messages: [{ role: "user", content }],
     system: `Bir diş hekimine yardımcı olan asistansın. Hasta fotoğrafları ve/veya panoramik röntgenden hekimin inceleyip DÜZELTECEĞİ bir ön değerlendirme TASLAĞI hazırlarsın. Bu bir teşhis değildir.
-Yalnız görüntüde makul ölçüde görülebilen durumları FDI diş numarasıyla raporla (eksik diş, kök artığı, belirgin çürük, mevcut kron/köprü/implant, kanal tedavili, gömülü). Emin olmadığın dişleri raporlama; güvenini dürüstçe belirt.
+Yalnız görüntüde makul ölçüde görülebilen durumları FDI diş numarasıyla raporla (eksik diş, kök artığı, belirgin çürük, mevcut kron/köprü/implant, kanal tedavili, gömülü). Her bulguda "status" alanı YALNIZ şemadaki değerlerden biri olmalı (ör. kanal tedavili → rct, kron/köprü ayağı → crown, köprü gövdesi → pontic, eksik → missing); açıklamayı "note" alanına yaz. Panoramik röntgende hastanın sağı görüntünün solundadır (sol taraf = 1. ve 4. kadran). Emin olmadığın dişleri "note" içinde şüphe belirterek ver; "confidence" ve "image_quality" alanlarını mutlaka doldur.
 Fotoğraftan kemik durumu veya kanal ihtiyacı gibi görülemeyen şeyleri iddia etme; bunları "needs" içinde ek görüntü olarak iste. Özet ve öneriler ${LANG[lang] ?? lang} dilinde, kısa ve klinik üslupla.` });
   await trackUsage(clinicId, "vision", model, r.usage);
-  const o = r.toolCalls[0]?.input; if (!o) throw new Error("empty");
-  const findings = (o.findings ?? []).filter((f: any) => Number.isInteger(f.tooth) && f.tooth >= 11 && f.tooth <= 48 && f.tooth % 10 >= 1 && f.tooth % 10 <= 8);
-  const out = { ...o, findings, images: files.length, at: new Date().toISOString(), by: userId, model };
+  const o = r.toolCalls.find((c) => c.name === "assess_output")?.input; if (!o) throw new Error("empty");
+  // model serbest metin durum yazarsa şema değerine indirgenir; şemaya oturmayanlar "other" + not olarak kalır
+  const findings = (o.findings ?? []).map((f: any) => { const st = normStatus(String(f.status ?? "")); return st ? { tooth: Number(f.tooth), status: st, note: STATUS.includes(String(f.status)) ? f.note : [f.status, f.note].filter(Boolean).join(" — ") } : null; })
+    .filter((f: any) => f && Number.isInteger(f.tooth) && f.tooth >= 11 && f.tooth <= 48 && f.tooth % 10 >= 1 && f.tooth % 10 <= 8);
+  const out = { ...o, confidence: ["low", "medium", "high"].includes(o.confidence) ? o.confidence : "low", imageQuality: ["good", "ok", "poor"].includes(o.image_quality ?? o.imageQuality) ? (o.image_quality ?? o.imageQuality) : "ok",
+    suggestions: Array.isArray(o.suggestions) ? o.suggestions : [], needs: Array.isArray(o.needs) ? o.needs : [], findings, images: files.length, at: new Date().toISOString(), by: userId, model };
+  delete (out as any).image_quality;
   await ownerSql`update cases set ai_assessment = ${ownerSql.json(out as never)} where id = ${caseId} and clinic_id = ${clinicId}`;
   return out;
 }

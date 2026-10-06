@@ -81,7 +81,7 @@ export function aiPlusRoutes(app: FastifyInstance) {
     const c = ctx(req); if (!c.perms["case.write"] && !c.perms["case.diagnose"]) throw forbidden("case.write"); const { id } = req.params as { id: string }; await aiReady(c.clinicId);
     const [k] = await withClinic(c.clinicId, (tx) => tx`select id from cases where id = ${id}`); if (!k) throw notFound("Vaka");
     try { const r = await assessCase(c.clinicId, id, c.userId); await withClinic(c.clinicId, (tx) => audit(tx, c, "case.ai_assess", "case", id, { findings: r.findings.length })); return r; }
-    catch (e) { if ((e as Error).message === "no_images") throw new HttpError(400, "no_images", "Önce fotoğraf veya röntgen yükleyin (JPEG/PNG, en fazla 4,5 MB)"); throw new HttpError(502, "ai_failed", (e as Error).message); }
+    catch (e) { if ((e as Error).message === "no_images") throw new HttpError(400, "no_images", "Önce fotoğraf veya röntgen yükleyin (JPEG/PNG, en fazla 4,5 MB)"); req.log.error({ err: e, caseId: id }, "ai_assess_failed"); throw new HttpError(502, "ai_failed", (e as Error).message); }
   });
   app.get("/api/cases/:id/ai-assess", async (req) => {
     const c = need(ctx(req), "case.read"); const { id } = req.params as { id: string };
