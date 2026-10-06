@@ -75,6 +75,10 @@ test("AI+: canlı koç (3 öneri, itiraz, çeviri), sesli mesaj dökümü, canl�
   await ownerSql`insert into files (id, clinic_id, kind, name, mime, size_bytes, storage_key, sha256, entity, entity_id) values (${fid}, ${clinicId}, 'photo', 'smile.jpg', 'image/jpeg', 2000, ${key}, 'x', 'case', ${k.body.id})`;
   const as = await c.post(`/api/cases/${k.body.id}/ai-assess`); assert.equal(as.status, 200, JSON.stringify(as.body)); assert.equal(as.body.findings.length, 3);
   assert.equal((await c.get(`/api/cases/${k.body.id}/ai-assess`)).body.images, 1);
+  // hekim geri bildirimi: kısmen doğru, 31 yanlış → kayıt + vaka üstünde özet + istatistik
+  const fb = await c.post(`/api/cases/${k.body.id}/ai-assess/feedback`, { verdict: "partial", wrongTeeth: [31], note: "31 çürük değil kron" }); assert.equal(fb.status, 200, JSON.stringify(fb.body));
+  assert.deepEqual((await c.get(`/api/cases/${k.body.id}/ai-assess`)).body.feedback.wrongTeeth, [31]);
+  const st = await c.get("/api/ai/assess-stats"); assert.equal(st.body.total, 1); assert.equal(st.body.partial, 1);
 
   // 5) benzer vaka
   await ownerSql`insert into clinic_content (clinic_id, kind, data, file_id) values (${clinicId}, 'gallery', ${ownerSql.json({ caption: "All-on-4 before/after", tags: "implant all-on-4" } as never)}, ${fid})`;

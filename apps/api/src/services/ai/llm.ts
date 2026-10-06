@@ -7,7 +7,7 @@ export type Tool = { name: string; description: string; input_schema: Record<str
 export type Msg = { role: "user" | "assistant"; content: string | any[] };
 export type LlmResult = { text: string; toolCalls: { id: string; name: string; input: any }[]; raw: any[]; usage: { input: number; output: number }; stop: string };
 
-export const MODELS = { agent: process.env.AI_MODEL_AGENT || "claude-sonnet-5-5", fast: process.env.AI_MODEL_FAST || "claude-haiku-4-5-20251001" };
+export const MODELS = { agent: process.env.AI_MODEL_AGENT || "claude-sonnet-5-5", fast: process.env.AI_MODEL_FAST || "claude-haiku-4-5-20251001", vision: process.env.AI_MODEL_VISION || process.env.AI_MODEL_AGENT || "claude-sonnet-5-5" };
 // $/milyon token → mikro-dolar/token ile aynı sayı
 const PRICE: Record<string, [number, number]> = { [MODELS.agent]: [Number(process.env.AI_PRICE_AGENT_IN ?? 3), Number(process.env.AI_PRICE_AGENT_OUT ?? 15)], [MODELS.fast]: [Number(process.env.AI_PRICE_FAST_IN ?? 1), Number(process.env.AI_PRICE_FAST_OUT ?? 5)] };
 export const costMicro = (model: string, u: { input: number; output: number }) => { const p = PRICE[model] ?? [3, 15]; return Math.round(u.input * p[0] + u.output * p[1]); };

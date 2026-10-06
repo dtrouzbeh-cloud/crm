@@ -16,6 +16,7 @@ export default function AiTab() {
   const r = () => qc.invalidateQueries({ queryKey: ["ai-agent"] });
   const save = async () => { try { await put("/api/ai/agent", { name: a.name, mode: a.mode, channels: a.channels, persona: a.persona ?? null, instructions: a.instructions ?? null, pricePolicy: a.pricePolicy, hours: a.hours ?? {}, features: a.features ?? {}, active: true }); setD(null); r(); toast(t("saved")); } catch (e) { toastErr(e); } };
   const k = data.key;
+  const { data: acc } = useQuery({ queryKey: ["assess-stats"], queryFn: () => get("/api/ai/assess-stats") });
   return <div className="col" style={{ gap: 14 }}>
     <div className="card pad row wrap" style={{ gap: 10 }}><b>🔑 {t("ai_key")}</b>
       {k.available ? <span className="bdg ok">✓ {k.clinic ? t("ai_key_clinic") : k.mock ? t("ai_key_mock") : t("ai_key_platform")}</span> : <span className="bdg err">{t("ai_key_none")}</span>}
@@ -25,7 +26,7 @@ export default function AiTab() {
 
     <div className="card pad col" style={{ gap: 8 }}><b>🧩 {t("ai_features")}</b>
       <div className="grid g2" style={{ gap: 6 }}>{[["coach", "🎯"], ["translate", "🌐"], ["scoring", "📈"], ["vision", "📷"], ["lossReport", "🧠"], ["qa", "📋"]].map(([fk, ic]) => <label key={fk} className="row small" style={{ gap: 8, alignItems: "flex-start" }}><Switch checked={(a.features ?? {})[fk] !== false && (fk !== "lossReport" || !!(a.features ?? {})[fk])} onChange={(v) => set({ features: { ...(a.features ?? {}), [fk]: v } })} /><span><b>{ic} {t("aif_" + fk)}</b><div className="tiny muted">{t("aif_" + fk + "_hint")}</div></span></label>)}</div>
-      <div className="row"><span className="grow" /><button className="btn sm pri" disabled={!d} onClick={save}>{t("save")}</button></div></div>
+      <div className="row small" style={{ gap: 8 }}>{acc && acc.total > 0 && <span className="muted">📷 {t("ai_accuracy")}: 👍 {acc.correct} · 🤏 {acc.partial} · 👎 {acc.wrong}</span>}<span className="grow" /><button className="btn sm pri" disabled={!d} onClick={save}>{t("save")}</button></div></div>
 
     <div className="card pad col" style={{ gap: 10 }}><div className="row"><b className="grow">🤖 {t("ai_agent")}</b><button className="btn sm pri" disabled={!d} onClick={save}>{t("save")}</button></div>
       <div className="grid g2" style={{ gap: 10 }}>

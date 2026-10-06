@@ -7,7 +7,7 @@ import { audit } from "../services/audit.ts";
 import { aiAvailable, isMock } from "../services/ai/llm.ts";
 import { overCap } from "../services/ai/agent.ts";
 import { coachConversation, translateText } from "../services/ai/coach.ts";
-import { assessCase, lossReport, qaReport, similarCases } from "../services/ai/extras.ts";
+import { assessCase, assessFeedback, assessStats, lossReport, qaReport, similarCases } from "../services/ai/extras.ts";
 import { callList, rescoreStale, scoreLead } from "../services/scoring.ts";
 import { getSecret, setSecret, listSecrets, type SecretName } from "../services/secrets.ts";
 import { sttConfig } from "../services/stt.ts";
@@ -83,6 +83,13 @@ export function aiPlusRoutes(app: FastifyInstance) {
     try { const r = await assessCase(c.clinicId, id, c.userId); await withClinic(c.clinicId, (tx) => audit(tx, c, "case.ai_assess", "case", id, { findings: r.findings.length })); return r; }
     catch (e) { if ((e as Error).message === "no_images") throw new HttpError(400, "no_images", "Önce fotoğraf veya röntgen yükleyin (JPEG/PNG, en fazla 4,5 MB)"); req.log.error({ err: e, caseId: id }, "ai_assess_failed"); throw new HttpError(502, "ai_failed", (e as Error).message); }
   });
+  app.post("/api/cases/:id/ai-assess/feedback", async (req) => {
+    const c = ctx(req); if (!c.perms["case.write"] && !c.perms["case.diagnose"]) throw forbidden("case.write"); const { id } = req.params as { id: string };
+    const b = z.object({ verdict: z.enum(["correct", "partial", "wrong"]), wrongTeeth: z.array(z.number().int().min(11).max(48)).max(32).optional(), note: z.string().max(1000).nullish() }).parse(req.body ?? {});
+    return withClinic(c.clinicId, async (tx) => { try { const r = await assessFeedback(tx, c.clinicId, id, c.userId, b); await audit(tx, c, "case.ai_feedback", "case", id, { verdict: b.verdict, wrong: b.wrongTeeth?.length ?? 0 }); return r; }
+      catch (e) { if ((e as Error).message === "no_assessment") throw new HttpError(400, "no_assessment", "Önce AI değerlendirmesi oluşturun"); throw e; } });
+  });
+  app.get("/api/ai/assess-stats", async (req) => { const c = need(ctx(req), "case.read"); return withClinic(c.clinicId, (tx) => assessStats(tx)); });
   app.get("/api/cases/:id/ai-assess", async (req) => {
     const c = need(ctx(req), "case.read"); const { id } = req.params as { id: string };
     return withClinic(c.clinicId, async (tx) => { const [k] = await tx`select ai_assessment from cases where id = ${id}`; if (!k) throw notFound("Vaka"); return k.aiAssessment ?? null; });

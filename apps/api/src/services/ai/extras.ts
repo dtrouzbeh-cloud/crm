@@ -10,15 +10,15 @@ const LANG: Record<string, string> = { tr: "Türkçe", en: "English", de: "Deuts
 const clinicLang = async (clinicId: string) => ((await ownerSql`select default_language from clinics where id = ${clinicId}`)[0]?.defaultLanguage as string) ?? "tr";
 
 // ── 1) Fotoğraf / röntgenden ön değerlendirme ──
-const STATUS = ["missing", "root", "caries", "crown", "bridge", "pontic", "impcr", "rct", "comp", "amalg", "impacted", "veneer", "other"];
-const STATUS_RX: [RegExp, string][] = [[/implant.*(kron|crown)|impcr/i, "impcr"], [/pontik|pontic|gövde|köprü gövdesi/i, "pontic"], [/dişsiz|eksik|missing|edentul|çekilmiş|yok/i, "missing"], [/kök artığı|kök kalıntısı|root (rest|remnant|fragment)|^root$/i, "root"],
+const STATUS = ["missing", "root", "caries", "crown", "bridge", "pontic", "impab", "impcr", "rct", "comp", "amalg", "impacted", "veneer", "other"];
+const STATUS_RX: [RegExp, string][] = [[/implant.*(kron|crown)|impcr/i, "impcr"], [/implant|mini.?implant|fikstür|fixture|impab/i, "impab"], [/pontik|pontic|gövde|köprü gövdesi/i, "pontic"], [/dişsiz|eksik|missing|edentul|çekilmiş|yok/i, "missing"], [/kök artığı|kök kalıntısı|root (rest|remnant|fragment)|^root$/i, "root"],
   [/gömülü|impacted/i, "impacted"], [/çürük|caries|karies/i, "caries"], [/veneer|lamina/i, "veneer"], [/amalgam|amalg/i, "amalg"], [/kompozit|composite|dolgu|filling|^comp$/i, "comp"], [/kanal|rct|endodont|root canal|post/i, "rct"], [/köprü|bridge/i, "bridge"], [/kron|crown|kuron|restorasyon/i, "crown"], [/mevcut|sağlam|normal|intact|sound/i, ""], [/./, "other"]];
-const normStatus = (s: string) => { const t = s.trim(); if (STATUS.includes(t)) return t; for (const [rx, v] of STATUS_RX) if (rx.test(t)) return v; return "other"; };
+const normStatus = (s: string) => { const t = s.trim(); if (t === "implant") return "impab"; if (t === "intact") return ""; if (STATUS.includes(t)) return t; for (const [rx, v] of STATUS_RX) if (rx.test(t)) return v; return "other"; };
 
 const ASSESS_TOOL = { name: "assess_output", description: "Ön değerlendirme taslağı", input_schema: { type: "object", required: ["summary", "findings", "confidence", "image_quality"], properties: {
   summary: { type: "string" }, image_quality: { type: "string", enum: ["good", "ok", "poor"] }, confidence: { type: "string", enum: ["low", "medium", "high"] },
   findings: { type: "array", maxItems: 32, items: { type: "object", required: ["tooth", "status"], properties: { tooth: { type: "integer", description: "FDI numarası (11–48)" },
-    status: { type: "string", enum: ["missing", "root", "caries", "crown", "bridge", "pontic", "impcr", "rct", "comp", "amalg", "impacted", "veneer", "other"] }, note: { type: "string" } } } },
+    status: { type: "string", enum: ["missing", "root", "caries", "crown", "bridge", "pontic", "implant", "impcr", "rct", "comp", "amalg", "impacted", "veneer", "intact", "other"], description: "implant = kronsuz implant/abutment, impcr = implant + kron, crown = doğal diş üzerinde kron/köprü ayağı, intact = sağlam doğal diş" }, note: { type: "string" } } } },
   suggestions: { type: "array", items: { type: "string" }, description: "Hekimin değerlendirebileceği olası tedavi yönleri" }, needs: { type: "array", items: { type: "string" }, description: "Net değerlendirme için gereken ek görüntü/bilgi" } } } };
 
 export async function assessCase(clinicId: string, caseId: string, userId: string) {
@@ -28,11 +28,18 @@ export async function assessCase(clinicId: string, caseId: string, userId: strin
   const content: any[] = [];
   for (const f of files) { const buf = await storage.get(f.storageKey as string); content.push({ type: "text", text: f.kind === "xray" ? "Röntgen:" : "Ağız içi/gülüş fotoğrafı:" }, { type: "image", source: { type: "base64", media_type: f.mime, data: buf.toString("base64") } }); }
   content.push({ type: "text", text: "Bu görüntülere göre ön değerlendirme taslağını hazırla." });
-  const model = MODELS.agent;
-  const r = await complete(clinicId, { model, maxTokens: 8000, tools: [ASSESS_TOOL], toolChoice: "assess_output", messages: [{ role: "user", content }],
-    system: `Bir diş hekimine yardımcı olan asistansın. Hasta fotoğrafları ve/veya panoramik röntgenden hekimin inceleyip DÜZELTECEĞİ bir ön değerlendirme TASLAĞI hazırlarsın. Bu bir teşhis değildir.
-Yalnız görüntüde makul ölçüde görülebilen durumları FDI diş numarasıyla raporla (eksik diş, kök artığı, belirgin çürük, mevcut kron/köprü/implant, kanal tedavili, gömülü). Her bulguda "status" alanı YALNIZ şemadaki değerlerden biri olmalı (ör. kanal tedavili → rct, kron/köprü ayağı → crown, köprü gövdesi → pontic, eksik → missing); açıklamayı "note" alanına yaz. Panoramik röntgende hastanın sağı görüntünün solundadır (sol taraf = 1. ve 4. kadran). Emin olmadığın dişleri "note" içinde şüphe belirterek ver; "confidence" ve "image_quality" alanlarını mutlaka doldur.
-Fotoğraftan kemik durumu veya kanal ihtiyacı gibi görülemeyen şeyleri iddia etme; bunları "needs" içinde ek görüntü olarak iste. Özet ve öneriler ${LANG[lang] ?? lang} dilinde, kısa ve klinik üslupla.` });
+  const model = MODELS.vision;
+  const r = await complete(clinicId, { model, maxTokens: 12000, tools: [ASSESS_TOOL], toolChoice: "assess_output", messages: [{ role: "user", content }],
+    system: `Deneyimli bir ağız-diş-çene radyolojisi uzmanı gibi görüntüleri sistematik oku; hekimin inceleyip DÜZELTECEĞİ bir ön değerlendirme TASLAĞI üret. Bu bir teşhis değildir.
+YÖNTEM: 1) Panoramikte önce üst, sonra alt çeneyi görüntünün SOLUNDAN (hastanın SAĞI = 1. ve 4. kadran) SAĞINA tara. 2) Her radyoopak yapıyı önce sınıflandır, sonra FDI numarası ver. 3) Özette çene başına kaç doğal diş, kaç implant, kaç dişsiz bölge saydığını yaz.
+AYIRT ETME KRİTERLERİ:
+- İMPLANT (status "implant" veya kronluysa "impcr"): homojen, çok parlak, yiv/vida biçimli ya da düz silindirik/konik; çevresinde kök dentini, pulpa veya periodontal aralık YOK; sıklıkla üstünde abutment/kron. İnce uzun homojen pinler (mini implant) de implanttır. Tam çene protezinde birden çok eşit boy ve parlaklıkta paralel pin görüyorsan implant olasılığını ÖNCE düşün.
+- POST-KOR (status "rct" veya kronluysa "crown"): parlak pin ama bir KÖK İÇİNDE; çevresinde dentin ve kök konturu, kök ucu görülür; genelde kanal dolgusuyla devam eder.
+- KANAL DOLGUSU ("rct"): kök içinde, köke uyumlu, implanttan daha az parlak çizgi.
+- KRON ("crown"): diş kuronunu saran parlak kap; altındaki kök doğal. Köprü ayağı da "crown", köprü ara gövdesi "pontic".
+- TAM ÇENE SABİT PROTEZ: çene boyunca kesintisiz opak bar; destekleri implant ise "implant"/"impcr", doğal diş ise "crown"/"rct" yaz; dişsiz ara bölgeleri "pontic" yaz.
+- EKSİK DİŞ ("missing"): alveol kretinde diş veya implant yok. Sağlam doğal dişi listelemene gerek yok ("intact" isteğe bağlı).
+Fotoğraftan kemik durumu veya kanal ihtiyacı gibi görülemeyen şeyleri iddia etme; bunları "needs" içinde ek görüntü olarak iste. Emin değilsen "note" içinde iki olasılığı ve hangisinin daha olası olduğunu yaz; "confidence" ve "image_quality" alanlarını mutlaka doldur. Özet ve öneriler ${LANG[lang] ?? lang} dilinde, kısa ve klinik üslupla.` });
   await trackUsage(clinicId, "vision", model, r.usage);
   const o = r.toolCalls.find((c) => c.name === "assess_output")?.input; if (!o) throw new Error("empty");
   // model serbest metin durum yazarsa şema değerine indirgenir; şemaya oturmayanlar "other" + not olarak kalır
@@ -43,6 +50,20 @@ Fotoğraftan kemik durumu veya kanal ihtiyacı gibi görülemeyen şeyleri iddia
   delete (out as any).image_quality;
   await ownerSql`update cases set ai_assessment = ${ownerSql.json(out as never)} where id = ${caseId} and clinic_id = ${clinicId}`;
   return out;
+}
+
+/** Hekim geri bildirimi: doğru / kısmen / yanlış + yanlış dişler + not → ai_feedback (doğruluk oranı için) */
+export async function assessFeedback(tx: Tx, clinicId: string, caseId: string, userId: string, b: { verdict: "correct" | "partial" | "wrong"; wrongTeeth?: number[]; note?: string | null }) {
+  const [k] = await tx`select ai_assessment from cases where id = ${caseId}`; if (!k?.aiAssessment) throw new Error("no_assessment");
+  const a = k.aiAssessment as any;
+  const [r] = await tx`insert into ai_feedback (clinic_id, kind, entity_id, verdict, wrong_teeth, note, model, snapshot, created_by) values (${clinicId}, 'assess', ${caseId}, ${b.verdict}, ${b.wrongTeeth ?? []}, ${b.note ?? null}, ${a.model ?? null}, ${tx.json(a)}, ${userId}) returning id, verdict, wrong_teeth, note, created_at`;
+  await tx`update cases set ai_assessment = ai_assessment || ${tx.json({ feedback: { verdict: b.verdict, wrongTeeth: b.wrongTeeth ?? [], note: b.note ?? null, at: new Date().toISOString() } } as never)} where id = ${caseId}`;
+  return r;
+}
+/** Klinik için AI değerlendirme doğruluk özeti */
+export async function assessStats(tx: Tx) {
+  const [r] = await tx`select count(*)::int as total, count(*) filter (where verdict = 'correct')::int as correct, count(*) filter (where verdict = 'partial')::int as partial, count(*) filter (where verdict = 'wrong')::int as wrong from ai_feedback where kind = 'assess'`;
+  return r;
 }
 
 // ── 2) Kayıp analizi ──
