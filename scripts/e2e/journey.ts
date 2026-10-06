@@ -129,7 +129,13 @@ async function main() {
   });
   await step("Google Ads lead entegrasyonu", async () => { const ig = exp(await admin.post("/api/integrations", { kind: "google_leads", name: "Google Ads" }), 200, "integration"); S.gUrl = new URL(ig.inboundUrl).pathname; S.gKey = ig.googleKey; });
   await step("REST API anahtarı (Zapier)", async () => { const k = exp(await admin.post("/api/integrations/api-keys", { name: "Zapier", scopes: ["leads:write"] }), 200, "apikey"); S.apiKey = k.key; });
-  await step("Instagram hesabı", async () => { S.igId = "17841" + rnd(10); exp(await admin.post("/api/inbox/accounts/meta", { channel: "instagram", externalId: S.igId, token: "IGQ" + "x".repeat(40), name: "ege_dental" }), 200, "ig"); });
+  await step("Instagram hesabı (Meta doğrulaması yerine doğrudan kayıt)", async () => {
+    S.igId = "17841" + rnd(10);
+    // sahte belirteç Meta'da reddedilir (entegrasyon testinde doğrulanıyor); burada hesap satırı doğrudan eklenir
+    exp(await admin.post("/api/inbox/accounts/meta", { channel: "instagram", externalId: S.igId, token: "IGQ" + "x".repeat(40), name: "ege_dental" }), 400, "sahte belirteç reddi");
+    const { default: postgres } = await import("postgres"); const db = postgres(process.env.E2E_DB_URL!, { max: 1 });
+    await db`insert into channel_accounts (clinic_id, channel, name, external_id, status) values (${S.clinicId}, 'instagram', 'ege_dental', ${S.igId}, 'connected')`; await db.end();
+  });
   await step("Hızlı takip dizisi (speed-to-lead) aktif", async () => {
     const s = exp(await admin.post("/api/sequences/from-template", { key: "speed_to_lead", lang: "tr" }), 200, "seq"); S.seqId = s.id;
     exp(await admin.put(`/api/sequences/${s.id}`, { active: true, settings: { quietStart: 0, quietEnd: 0 } }), 200, "seq on");

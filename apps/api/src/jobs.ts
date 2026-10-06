@@ -20,6 +20,7 @@ export const handlers: Record<string, JobHandler> = {
     await sendInConversation({ clinicId: clinicId!, userId: null as unknown as string }, String(p.conversationId), m);
     if (p.ai) { const { ownerSql } = await import("./db.ts"); await ownerSql`update messages set ai = true where conversation_id = ${String(p.conversationId)} and idempotency_key = ${String(p.idem)}`; }
   },
+  "meta.leadgen": async (p) => { const { fetchMetaLead } = await import("./routes/integrations.ts"); await fetchMetaLead(String(p.integrationId), String(p.leadgenId)); },
   "webhook.dispatch": async (p, clinicId) => { await dispatchWebhook(Number(p.eventId), clinicId!); },
   "wa.autoreply": async (p) => {
     const [cv] = await ownerSql`select cv.*, a.access_token_enc, a.external_id as phone_id, a.config from conversations cv join channel_accounts a on a.id = cv.account_id where cv.id = ${p.conversationId as string}`;

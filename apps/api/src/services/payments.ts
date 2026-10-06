@@ -7,9 +7,11 @@ export interface CheckoutResult { url?: string; providerRef?: string; bank?: Rec
 export interface Provider {
   id: string; label: string; currencies: string[] | "any"; fields: { key: string; label: string; secret?: boolean }[];
   checkout(creds: Creds, cfg: Record<string, any>, input: CheckoutInput, mode: "test" | "live"): Promise<CheckoutResult>;
-  test?(creds: Creds, mode: "test" | "live"): Promise<boolean>;
+  /** Sağlayıcıya kimlik doğrulamalı gerçek bir çağrı; mesaj sağlayıcının kendi hata metnidir */
+  test?(creds: Creds, mode: "test" | "live"): Promise<{ ok: boolean; message: string }>;
 }
 
+const T = () => AbortSignal.timeout(20_000);   // sağlayıcı yanıt vermezse istek asılı kalmasın
 const form = (o: Record<string, string | number | undefined>) => Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
 
 // ── Stripe (kart, Apple Pay, Google Pay, SEPA, Klarna — hesap ayarına göre) ──
@@ -20,11 +22,15 @@ export const stripe: Provider = {
     const body = form({ mode: "payment", "line_items[0][price_data][currency]": i.currency.toLowerCase(), "line_items[0][price_data][unit_amount]": i.amountMinor,
       "line_items[0][price_data][product_data][name]": i.description, "line_items[0][quantity]": 1, success_url: i.successUrl, cancel_url: i.cancelUrl,
       client_reference_id: i.intentId, "metadata[intent_id]": i.intentId, customer_email: i.customerEmail ?? undefined, locale: ["tr", "en", "de", "fr", "es", "it", "nl"].includes(i.locale) ? i.locale : "auto" });
-    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { Authorization: `Bearer ${creds.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" }, body });
+    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { Authorization: `Bearer ${creds.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" }, body, signal: T() });
     const j = await r.json() as any; if (!r.ok) throw new Error(j.error?.message ?? "Stripe hatası");
     return { url: j.url, providerRef: j.id };
   },
-  async test(creds) { const r = await fetch("https://api.stripe.com/v1/balance", { headers: { Authorization: `Bearer ${creds.secretKey}` } }); return r.ok; },
+  async test(creds) {
+    if (!/^(sk|rk)_(test|live)_/.test(creds.secretKey ?? "")) return { ok: false, message: "Secret key sk_test_… veya sk_live_… ile başlamalı" };
+    const r = await fetch("https://api.stripe.com/v1/balance", { headers: { Authorization: `Bearer ${creds.secretKey}` }, signal: T() }); const j = await r.json().catch(() => ({})) as any;
+    return r.ok ? { ok: true, message: `Bağlantı başarılı (${creds.secretKey!.includes("_test_") ? "test" : "canlı"} mod)` } : { ok: false, message: `Stripe ${r.status}: ${j.error?.message ?? "bilinmeyen hata"}` };
+  },
 };
 /** Stripe-Signature doğrulaması: t=…,v1=… ; HMAC-SHA256(`${t}.${payload}`) ; 5 dk tolerans */
 export function verifyStripeSignature(payload: string, header: string | undefined, secret: string, toleranceSec = 300): boolean {
@@ -55,22 +61,28 @@ export const iyzico: Provider = {
       billingAddress: { contactName: i.customerName || "Patient", city: "N/A", country: "N/A", address: "N/A" },
       basketItems: [{ id: "deposit", name: i.description.slice(0, 100), category1: "Dental", itemType: "VIRTUAL", price }] });
     const path = "/payment/iyzipos/checkoutform/initialize/auth/ecom";
-    const r = await fetch(iyziBase(mode) + path, { method: "POST", headers: iyziAuth(creds.apiKey!, creds.secretKey!, path, body), body });
+    const r = await fetch(iyziBase(mode) + path, { method: "POST", headers: iyziAuth(creds.apiKey!, creds.secretKey!, path, body), body, signal: T() });
     const j = await r.json() as any; if (j.status !== "success") throw new Error(j.errorMessage ?? "iyzico hatası");
     return { url: j.paymentPageUrl, providerRef: j.token };
+  },
+  // kimlik doğrulamalı en hafif uç: BIN sorgusu (ödeme oluşturmaz)
+  async test(creds, mode) {
+    const path = "/payment/bin/check", body = JSON.stringify({ locale: "tr", conversationId: "df-test", binNumber: "554960" });
+    const r = await fetch(iyziBase(mode) + path, { method: "POST", headers: iyziAuth(creds.apiKey ?? "", creds.secretKey ?? "", path, body), body, signal: T() }); const j = await r.json().catch(() => ({})) as any;
+    return j.status === "success" ? { ok: true, message: `Bağlantı başarılı (${mode === "live" ? "canlı" : "sandbox"})` } : { ok: false, message: `iyzico: ${j.errorMessage ?? r.status}${j.errorCode ? ` (kod ${j.errorCode})` : ""}` };
   },
 };
 export async function iyzicoRetrieve(creds: Creds, mode: string, token: string) {
   const path = "/payment/iyzipos/checkoutform/auth/ecom/detail";
   const body = JSON.stringify({ locale: "en", token });
-  const r = await fetch(iyziBase(mode) + path, { method: "POST", headers: iyziAuth(creds.apiKey!, creds.secretKey!, path, body), body });
+  const r = await fetch(iyziBase(mode) + path, { method: "POST", headers: iyziAuth(creds.apiKey!, creds.secretKey!, path, body), body, signal: T() });
   return r.json() as Promise<any>;
 }
 
 // ── PayPal (Orders v2) ──
 const ppBase = (mode: string) => (mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com");
 async function ppToken(creds: Creds, mode: string) {
-  const r = await fetch(ppBase(mode) + "/v1/oauth2/token", { method: "POST", headers: { Authorization: "Basic " + Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=client_credentials" });
+  const r = await fetch(ppBase(mode) + "/v1/oauth2/token", { method: "POST", headers: { Authorization: "Basic " + Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=client_credentials", signal: T() });
   const j = await r.json() as any; if (!r.ok) throw new Error(j.error_description ?? "PayPal kimlik hatası"); return j.access_token as string;
 }
 export const paypal: Provider = {
@@ -80,15 +92,15 @@ export const paypal: Provider = {
     const tok = await ppToken(creds, mode);
     const r = await fetch(ppBase(mode) + "/v2/checkout/orders", { method: "POST", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json", "PayPal-Request-Id": i.intentId },
       body: JSON.stringify({ intent: "CAPTURE", purchase_units: [{ reference_id: i.intentId, custom_id: i.intentId, description: i.description.slice(0, 127), amount: { currency_code: i.currency, value: (i.amountMinor / 100).toFixed(2) } }],
-        application_context: { return_url: i.callbackUrl, cancel_url: i.cancelUrl, user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING" } }) });
+        application_context: { return_url: i.callbackUrl, cancel_url: i.cancelUrl, user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING" } }), signal: T() });
     const j = await r.json() as any; if (!r.ok) throw new Error(j.message ?? "PayPal hatası");
     return { url: j.links.find((l: any) => l.rel === "approve")?.href, providerRef: j.id };
   },
-  async test(creds, mode) { try { await ppToken(creds, mode); return true; } catch { return false; } },
+  async test(creds, mode) { try { await ppToken(creds, mode); return { ok: true, message: `Bağlantı başarılı (${mode === "live" ? "canlı" : "sandbox"})` }; } catch (e) { return { ok: false, message: `PayPal: ${(e as Error).message}` }; } },
 };
 export async function paypalCapture(creds: Creds, mode: string, orderId: string) {
   const tok = await ppToken(creds, mode);
-  const r = await fetch(ppBase(mode) + `/v2/checkout/orders/${orderId}/capture`, { method: "POST", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" } });
+  const r = await fetch(ppBase(mode) + `/v2/checkout/orders/${orderId}/capture`, { method: "POST", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, signal: T() });
   return r.json() as Promise<any>;
 }
 

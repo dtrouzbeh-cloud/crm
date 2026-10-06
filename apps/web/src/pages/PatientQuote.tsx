@@ -100,7 +100,7 @@ function DepositBox({ token, q, T, M }: any) {
   const shown = bank ?? (dep?.pending?.provider === "bank_transfer" ? dep.pending : null);
   return <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #E3E8EC" }}>
     <h3 style={{ margin: "0 0 8px" }}>{T("pay_deposit")} · {M(op.calc.deposit)}</h3>
-    {dep?.pending && !bank && <div className="small" style={{ marginBottom: 8, color: "#8A5A00" }}>⏳ {T("transfer_pending")}</div>}
+    {dep?.pending?.provider === "bank_transfer" && !bank && <div className="small" style={{ marginBottom: 8, color: "#8A5A00" }}>⏳ {T("transfer_pending")}</div>}
     <div className="row wrap" style={{ gap: 8 }}>{q.payment.map((p: any) => <button key={p.provider} className="btn" disabled={busy} onClick={() => pay(p.provider)}>{T("pm_" + p.provider)}</button>)}</div>
     {shown && <div className="note" style={{ marginTop: 10 }}><div><b>{T("bank_details")}</b></div>{shown.bank?.accountName && <div>{shown.bank.accountName}</div>}{shown.bank?.iban && <div className="code">IBAN: {shown.bank.iban}</div>}{shown.bank?.swift && <div>SWIFT: {shown.bank.swift}</div>}<div>{T("reference")}: <b className="code">{shown.referenceCode}</b></div></div>}
   </div>;

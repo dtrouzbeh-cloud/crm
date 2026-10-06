@@ -2,8 +2,9 @@
 import { createHash } from "node:crypto";
 import { ownerSql, type Tx } from "../db.ts";
 import { decrypt } from "../lib/crypto.ts";
+import { meta } from "../config.ts";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = meta.graph;
 const h = (s: string) => createHash("sha256").update(s).digest("hex");
 
 export async function metaIntegration(clinicId: string) {
@@ -79,7 +80,7 @@ export async function conversionHooks(ev: { clinicId: string; type: string; payl
   let value: number | null = null, currency: string | null = null;
   if (key === "deal.created") { value = Number(ev.payload.value ?? 0) ? Math.round(Number(ev.payload.value) * 100) : null; currency = (ev.payload.currency as string) ?? null; }
   if (key === "payment.first") { const [{ n }] = await ownerSql`select count(*)::int as n from payments p join deals d on d.id = p.deal_id where d.lead_id = ${leadId} and p.kind = 'payment'` as unknown as [{ n: number }]; if (n > 1) return; value = Number(ev.payload.amountMinor ?? 0); currency = (ev.payload.currency as string) ?? null; }
-  const r = await ownerSql`insert into conversion_events (clinic_id, lead_id, platform, event, value_minor, currency) values (${ev.clinicId}, ${leadId}, 'meta', ${event}, ${value}, ${currency}) on conflict do nothing returning id`;
+  const r = await ownerSql`insert into conversion_events (clinic_id, lead_id, platform, event, value_minor, currency) select ${ev.clinicId}, ${leadId}, 'meta', ${event}, ${value}, ${currency} where exists (select 1 from leads where id = ${leadId}) on conflict do nothing returning id`;
   if (r.length) await ownerSql`insert into jobs (clinic_id, type, payload, run_at) values (${ev.clinicId}, 'capi.send', ${ownerSql.json({ id: Number(r[0]!.id) } as never)}, now() + interval '30 seconds')`;
 }
 

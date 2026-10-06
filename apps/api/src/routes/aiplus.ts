@@ -185,7 +185,10 @@ export function aiPlusRoutes(app: FastifyInstance) {
       else { if (!sec) return { ok: false, message: "Anahtar yok" }; r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sec.value.sid}.json`, { headers: { Authorization: "Basic " + Buffer.from(`${sec.value.sid}:${sec.value.token}`).toString("base64") }, signal: sig }); }
       // Resend: yalnız gönderim yetkili anahtarlar /domains için 401 "restricted" döner — bu da geçerli anahtardır
       if (name === "resend" && r.status === 401) { const j: any = await r.json().catch(() => ({})); if (/restricted/i.test(j?.message ?? "")) return { ok: true, message: "Anahtar geçerli (yalnız gönderim yetkili)" }; }
-      return r.ok ? { ok: true, message: "Bağlantı başarılı" } : { ok: false, message: `Sağlayıcı ${r.status} döndü — anahtarı kontrol edin` };
+      if (r.ok) return { ok: true, message: "Bağlantı başarılı" };
+      const j: any = await r.json().catch(() => ({}));
+      const pm = j?.error?.message ?? j?.err_msg ?? j?.message ?? j?.detail?.message ?? (typeof j?.detail === "string" ? j.detail : null) ?? j?.error ?? null;
+      return { ok: false, message: `Sağlayıcı ${r.status}${pm ? ": " + String(pm).slice(0, 200) : ""} — anahtarı kontrol edin` };
     } catch (e) { return { ok: false, message: "Bağlanılamadı: " + (e as Error).message }; }
   });
 }

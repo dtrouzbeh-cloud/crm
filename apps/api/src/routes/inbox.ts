@@ -16,7 +16,7 @@ async function account(tx: Tx, id: string) {
 /** Instagram DM / Messenger gönderimi (Graph API, sayfa erişim anahtarı) */
 async function metaSend(a: { token: string; externalId: string }, recipient: string, text: string) {
   if (!text) throw new HttpError(400, "text_only", "Bu kanalda yalnız metin gönderilebilir");
-  const r = await fetch(`https://graph.facebook.com/v21.0/${a.externalId}/messages?access_token=${encodeURIComponent(a.token)}`, { method: "POST", headers: { "content-type": "application/json" },
+  const r = await fetch(`${meta.graph}/${a.externalId}/messages`, { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${a.token}` },
     body: JSON.stringify({ recipient: { id: recipient }, messaging_type: "RESPONSE", message: { text } }), signal: AbortSignal.timeout(20_000) });
   const j: any = await r.json().catch(() => ({})); if (!r.ok) throw new WaError(j?.error?.message ?? `meta_${r.status}`, j?.error?.code);
   return { messages: [{ id: j.message_id ?? null }] };

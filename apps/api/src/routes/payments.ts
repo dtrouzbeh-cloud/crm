@@ -7,6 +7,7 @@ import { audit } from "../services/audit.ts";
 import { encrypt, decrypt, sha256 } from "../lib/crypto.ts";
 import { PROVIDERS, verifyStripeSignature, iyzicoRetrieve, paypalCapture, type Creds } from "../services/payments.ts";
 import { recordPayment } from "./deals.ts";
+import { notifyUser } from "../services/notify.ts";
 
 async function providerRow(clinicId: string, provider: string) {
   const [p] = await ownerSql`select * from payment_providers where clinic_id = ${clinicId} and provider = ${provider} and active`;
@@ -54,8 +55,9 @@ export function paymentRoutes(app: FastifyInstance) {
     const c = need(ctx(req), "settings.manage");
     const { provider } = req.params as { provider: string };
     const p = await providerRow(c.clinicId, provider);
-    const ok = PROVIDERS[provider]?.test ? await PROVIDERS[provider]!.test!(p.creds, p.mode) : true;
-    return { ok };
+    const t = PROVIDERS[provider]?.test;
+    if (!t) return { ok: true, message: "Bu yöntem dış bağlantı gerektirmez" };
+    try { return await t(p.creds, p.mode); } catch (e) { return { ok: false, message: "Sağlayıcıya ulaşılamadı: " + (e as Error).message }; }
   });
 
   // Personel: deal için ödeme bağlantısı oluştur (WhatsApp ile gönderilebilir)
@@ -134,8 +136,19 @@ async function startCheckout(clinicId: string, o: { dealId: string; quoteId: str
   const [i] = await ownerSql`insert into payment_intents (clinic_id, deal_id, quote_id, provider, purpose, amount_minor, currency, status, meta) values (${clinicId}, ${o.dealId}, ${o.quoteId}, ${o.provider}, ${o.purpose}, ${o.amountMinor}, ${o.currency}, 'pending', ${ownerSql.json({ returnPath: o.returnPath } as never)}) returning id`;
   const base = config.appUrl;
   const cb = o.provider === "iyzico" ? `${base}/api/public/pay/iyzico/callback?intent=${i!.id}` : o.provider === "paypal" ? `${base}/api/public/pay/paypal/return?intent=${i!.id}` : `${base}${o.returnPath}?paid=1`;
-  const res = await P.checkout(p.creds, p.config ?? {}, { intentId: i!.id, amountMinor: o.amountMinor, currency: o.currency, description: `Deposit — ${o.name}`, customerEmail: o.email, customerName: o.name,
-    successUrl: `${base}${o.returnPath}?paid=1`, cancelUrl: `${base}${o.returnPath}?paid=0`, callbackUrl: cb, locale: o.lang, buyerIp: ip }, p.mode);
+  let res: Awaited<ReturnType<typeof P.checkout>>;
+  try {
+    res = await P.checkout(p.creds, p.config ?? {}, { intentId: i!.id, amountMinor: o.amountMinor, currency: o.currency, description: `Deposit — ${o.name}`, customerEmail: o.email, customerName: o.name,
+      successUrl: `${base}${o.returnPath}?paid=1`, cancelUrl: `${base}${o.returnPath}?paid=0`, callbackUrl: cb, locale: o.lang, buyerIp: ip }, p.mode);
+  } catch (e) {
+    // sağlayıcı reddetti (yanlış anahtar, kapalı hesap, kesinti): hastaya anlaşılır mesaj, kliniğe bildirim; deneme "beklemede" kalmasın
+    const msg = (e as Error).message.slice(0, 300);
+    await ownerSql`update payment_intents set status = 'failed', meta = meta || ${ownerSql.json({ error: msg } as never)} where id = ${i!.id}`;
+    console.error("checkout", o.provider, clinicId, msg);
+    const admins = await ownerSql`select user_id from memberships where clinic_id = ${clinicId} and active and role in ('admin','accounting')`;
+    for (const a of admins) await notifyUser(clinicId, a.userId as string, "payment.provider_error", `⚠️ ${P.label}: hasta ödeme sayfası açılamadı — ${msg}`, "/settings/payments").catch(() => {});
+    throw new HttpError(502, "payment_unavailable", "Online ödeme şu anda açılamıyor. Lütfen başka bir ödeme yöntemi seçin veya klinikle iletişime geçin.");
+  }
   await ownerSql`update payment_intents set provider_ref = ${res.providerRef ?? null}, checkout_url = ${res.url ?? null}, reference_code = ${res.referenceCode ?? null} where id = ${i!.id}`;
   return { intentId: i!.id, checkoutUrl: res.url ?? null, bank: res.bank ?? null, referenceCode: res.referenceCode ?? null };
 }

@@ -18,3 +18,13 @@ ssh root@SUNUCU 'E2E_APP=/opt/dentaflow/e2e-app bash /opt/dentaflow/e2e-app/scri
 - `E2E_KEEP=1` örneği açık bırakır (arayüz kontrolü için `ssh -L 4199:127.0.0.1:4199`).
 - Gerçek AI kullanılır (platform anahtarı); bir çalıştırma ≈ 0,5 USD.
 - WhatsApp gönderimleri sahte hesap yüzünden Meta'da reddedilir; bu beklenen bir durumdur.
+
+## Entegrasyon testi
+`scripts/e2e/integrations.ts` (31 adım) iki katmanı sınar:
+- **Gerçek sağlayıcılar, geçersiz anahtarla:** Anthropic (platform anahtarıyla gerçek bağlantı da), OpenAI/Deepgram/ElevenLabs, Resend, Twilio, Stripe/iyzico/PayPal sandbox, Meta Graph (WhatsApp, Instagram, Lead Ads, reklam harcaması, CAPI). Sağlayıcının kimlik hatası, isteğin doğru adrese doğru biçimde gittiğini kanıtlar; hata kullanıcıya düzgün dönmeli.
+- **Sistem içi:** Meta webhook doğrulaması, WhatsApp mesaj durumları, Meta lead yeniden deneme kuyruğu, genel gelen webhook ve Google Ads, REST API kapsamları, CSV içe aktarma/geri alma, giden webhook (HMAC, teslim, 500'de yeniden deneme), imzalı Stripe webhook (idempotent), SSRF koruması.
+
+```bash
+ssh root@SUNUCU 'bash /opt/dentaflow/e2e-app/scripts/e2e/run-integrations.sh'
+```
+Gerçek bir başarılı ödeme/mesaj için klinik kendi anahtarlarını Ayarlar → Kurulum ve Ödemeler'e girip "Bağlantıyı test et" ile doğrular.

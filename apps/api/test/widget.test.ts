@@ -50,7 +50,10 @@ test("Instagram/Messenger: webhook gövdesi → lead + konuşma, tekrar gelen me
   const { parseMetaMessages, ingestMeta } = await import("../src/routes/widget.ts");
   const { c } = await signup(app);
   const igId = String(Date.now()).slice(-12);
-  assert.equal((await c.post("/api/inbox/accounts/meta", { channel: "instagram", externalId: igId, token: "x".repeat(30), name: "clinic_ig" })).status, 200);
+  // bağlantıda belirteç Meta'da doğrulanır: sahte belirteç reddedilir, hesap testte doğrudan eklenir
+  assert.equal((await c.post("/api/inbox/accounts/meta", { channel: "instagram", externalId: igId, token: "x".repeat(30), name: "clinic_ig" })).status, 400);
+  const me = (await c.get("/api/auth/me")).body;
+  await ownerSql`insert into channel_accounts (clinic_id, channel, name, external_id, status) values (${me.clinic.id}, 'instagram', 'clinic_ig', ${igId}, 'connected')`;
   const body = { object: "instagram", entry: [{ id: igId, messaging: [{ sender: { id: "99887766" }, recipient: { id: igId }, message: { mid: "mid.1", text: "Hi, price for veneers?" } }] }] };
   const ms = parseMetaMessages(body); assert.equal(ms.length, 1); assert.equal(ms[0]!.channel, "instagram");
   const r = await ingestMeta(ms[0]!) as any; assert.ok(r.conversationId);

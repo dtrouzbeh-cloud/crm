@@ -1,6 +1,7 @@
 // Giden webhook'lar: olay → abonelikler; HMAC-SHA256 imza (X-DentaFlow-Signature), teslim kaydı, hata sayacı
 import { createHmac } from "node:crypto";
 import { ownerSql } from "../db.ts";
+import { assertPublicUrl } from "../lib/netguard.ts";
 
 export async function dispatchWebhook(eventId: number, clinicId: string) {
   const [ev] = await ownerSql`select id, type, entity_id, payload, created_at from outbox_events where id = ${eventId}`;
@@ -12,7 +13,8 @@ export async function dispatchWebhook(eventId: number, clinicId: string) {
     const ts = Math.floor(Date.now() / 1000), sig = createHmac("sha256", ep.secret).update(`${ts}.${body}`).digest("hex");
     const t0 = Date.now(); let status = 0, text = "";
     try {
-      const r = await fetch(ep.url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "DentaFlow-Webhooks/1", "X-DentaFlow-Event": ev.type, "X-DentaFlow-Signature": `t=${ts},v1=${sig}` }, body, signal: AbortSignal.timeout(10_000) });
+      await assertPublicUrl(ep.url);
+      const r = await fetch(ep.url, { redirect: "manual", method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "DentaFlow-Webhooks/1", "X-DentaFlow-Event": ev.type, "X-DentaFlow-Signature": `t=${ts},v1=${sig}` }, body, signal: AbortSignal.timeout(10_000) });
       status = r.status; text = (await r.text()).slice(0, 500);
     } catch (e) { text = (e as Error).message; }
     await ownerSql`insert into webhook_deliveries (clinic_id, endpoint_id, event_id, event_type, status, response, duration_ms) values (${clinicId}, ${ep.id}, ${ev.id}, ${ev.type}, ${status}, ${text}, ${Date.now() - t0})`;

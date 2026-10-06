@@ -29,7 +29,7 @@ function ProviderCard({ p, row, onSaved }: { p: any; row: any; onSaved: () => vo
       {p.id === "bank_transfer" && <div className="grid g2">{cfg("accountName", t("account_name"))}{cfg("bankName", t("bank_name"))}{cfg("iban", "IBAN")}{cfg("swift", "SWIFT / BIC")}</div>}
       {p.id === "payment_link" && cfg("url", t("payment_link_url"))}
       <Switch checked={f.active} onChange={(v) => setF({ ...f, active: v })} label={t("active")} />
-      <div className="row"><button className="btn pri" onClick={save}>{t("save")}</button>{row && p.fields.length > 0 && <button className="btn" onClick={async () => { const r = await post(`/api/payment-providers/${p.id}/test`); toast(r.ok ? "✓ OK" : "✗"); }}>{t("test_connection")}</button>}</div>
+      <div className="row"><button className="btn pri" onClick={save}>{t("save")}</button>{row && p.fields.length > 0 && <button className="btn" onClick={async () => { const r = await post(`/api/payment-providers/${p.id}/test`); toast((r.ok ? "✓ " : "✗ ") + (r.message ?? "")); }}>{t("test_connection")}</button>}</div>
       {(hook || p.id === "stripe") && <div className="small muted">Webhook URL: <span className="code">{hook ?? location.origin + "/api/public/pay/stripe/webhook"}</span> · event: checkout.session.completed</div>}
     </div>}</div>;
 }

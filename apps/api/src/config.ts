@@ -24,7 +24,8 @@ export const meta = {
   appSecret: process.env.META_APP_SECRET ?? "",
   verifyToken: process.env.META_VERIFY_TOKEN ?? "",
   configId: process.env.META_ES_CONFIG_ID ?? "",     // Embedded Signup yapılandırma kimliği
-  graph: process.env.META_GRAPH_URL ?? "https://graph.facebook.com/v21.0",
+  // Graph API sürümü tek yerden: v21.0 21.01.2027'de kapanıyor; v26.0 (Temmuz 2026). Yükseltme: META_GRAPH_URL
+  graph: process.env.META_GRAPH_URL ?? "https://graph.facebook.com/v26.0",
 };
 // Platform SaaS faturalandırması (kliniklerden abonelik tahsilatı)
 export const billing = {

@@ -163,6 +163,9 @@ export function metaMessagingRoutes(app: FastifyInstance) {
   app.post("/api/inbox/accounts/meta", async (req) => {
     const c = need(ctx(req), "integrations.manage");
     const b = parse(z.object({ channel: z.enum(["messenger", "instagram"]), externalId: z.string().regex(/^\d{5,30}$/), token: z.string().min(20), name: z.string().trim().min(1).max(80) }), req.body);
+    // belirteç ve hesap kimliği Meta'da doğrulanır: yanlış anahtar sessizce kaydedilip ilk mesajda patlamasın
+    const chk = await fetch(`${meta.graph}/${b.externalId}?fields=id,name`, { headers: { Authorization: `Bearer ${b.token}` }, signal: AbortSignal.timeout(15_000) }).then((r) => r.json()).catch((e) => ({ error: { message: (e as Error).message } })) as any;
+    if (chk?.error) throw new HttpError(400, "meta_error", `Meta: ${chk.error.message}`);
     return withClinic(c.clinicId, async (tx) => {
       const [a] = await tx`insert into channel_accounts (clinic_id, channel, name, external_id, access_token_enc, status) values (${c.clinicId}, ${b.channel}, ${b.name}, ${b.externalId}, ${encrypt(b.token)}, 'connected')
         on conflict (channel, external_id) do update set access_token_enc = excluded.access_token_enc, name = excluded.name, status = 'connected' where channel_accounts.clinic_id = ${c.clinicId} returning id`;

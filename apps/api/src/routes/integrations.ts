@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { assertPublicUrl } from "../lib/netguard.ts";
 import { z } from "zod";
 import { withClinic, ownerSql, type Tx } from "../db.ts";
 import { config, meta } from "../config.ts";
@@ -79,6 +80,7 @@ export function integrationRoutes(app: FastifyInstance) {
   app.post("/api/integrations/webhooks", async (req) => {
     const c = need(ctx(req), "integrations.manage");
     const b = parse(z.object({ url: z.url().refine((u) => u.startsWith("https://") || !config.isProd, "HTTPS gerekli"), events: z.array(z.string()).min(1) }), req.body);
+    try { await assertPublicUrl(b.url); } catch (e) { throw new HttpError(400, "bad_url", (e as Error).message); }
     const secret = "whsec_" + randomToken(24);
     await withClinic(c.clinicId, async (tx) => { await tx`insert into webhook_endpoints (clinic_id, url, events, secret) values (${c.clinicId}, ${b.url}, ${b.events}, ${secret})`; await audit(tx, c, "webhook.create", "webhook", null, b); });
     return { secret };
@@ -90,7 +92,7 @@ export function integrationRoutes(app: FastifyInstance) {
     const c = need(ctx(req), "integrations.manage"); const { id } = req.params as { id: string };
     const [ep] = await withClinic(c.clinicId, (tx) => tx`select url, secret from webhook_endpoints where id = ${id}`); if (!ep) throw notFound("Webhook");
     const body = JSON.stringify({ id: "test", type: "test.ping", created: new Date().toISOString(), data: { hello: "DentaFlow" } }), ts = Math.floor(Date.now() / 1000);
-    try { const r = await fetch(ep.url, { method: "POST", headers: { "Content-Type": "application/json", "X-DentaFlow-Event": "test.ping", "X-DentaFlow-Signature": `t=${ts},v1=${signPayload(ep.secret, ts, body)}` }, body, signal: AbortSignal.timeout(10000) }); return { status: r.status }; }
+    try { await assertPublicUrl(ep.url); const r = await fetch(ep.url, { redirect: "manual", method: "POST", headers: { "Content-Type": "application/json", "X-DentaFlow-Event": "test.ping", "X-DentaFlow-Signature": `t=${ts},v1=${signPayload(ep.secret, ts, body)}` }, body, signal: AbortSignal.timeout(10000) }); return { status: r.status }; }
     catch (e) { return { status: 0, error: (e as Error).message }; }
   });
 
@@ -153,12 +155,12 @@ export function integrationRoutes(app: FastifyInstance) {
     for (const e of (req.body as any)?.entry ?? []) for (const ch of e.changes ?? []) {
       if (ch.field !== "leadgen") continue;
       const v = ch.value; const [ig] = await ownerSql`select * from integrations where kind = 'meta_leads' and config->>'pageId' = ${String(v.page_id)} and status <> 'disabled' limit 1`; if (!ig) continue;
-      try {
-        const lead = await (await fetch(`${meta.graph}/${v.leadgen_id}?fields=field_data,created_time,ad_name,adset_name,campaign_name,form_id&access_token=${decrypt(ig.credentialsEnc)}`)).json() as any;
-        if (lead.error) throw new Error(lead.error.message);
-        await ingestLead(ig.clinicId, "meta", String(v.leadgen_id), lead, { fieldMap: ig.config?.fieldMap, defaults: { source: "meta", campaign: lead.campaign_name, ownerId: ig.config?.ownerId } });
-        await ownerSql`update integrations set last_sync_at = now(), status = 'healthy', last_error = null where id = ${ig.id}`;
-      } catch (err) { await ownerSql`update integrations set status = 'error', last_error = ${(err as Error).message} where id = ${ig.id}`; }
+      try { await fetchMetaLead(ig.id as string, String(v.leadgen_id)); }
+      catch (err) {
+        // lead kaybolmasın: Graph geçici hata / süresi dolmuş anahtar → kuyruğa al, artan aralıklarla yeniden dene
+        await ownerSql`update integrations set status = 'error', last_error = ${(err as Error).message} where id = ${ig.id}`;
+        await ownerSql`insert into jobs (clinic_id, type, payload, run_at, dedupe_key) values (${ig.clinicId}, 'meta.leadgen', ${ownerSql.json({ integrationId: ig.id, leadgenId: String(v.leadgen_id) } as never)}, now() + interval '1 minute', ${"leadgen:" + v.leadgen_id}) on conflict (dedupe_key) do nothing`;
+      }
     }
     return { ok: true };
   });
@@ -214,4 +216,14 @@ export function parseCsv(text: string): string[][] {
   }
   row.push(cell); if (row.some((x) => x !== "")) rows.push(row);
   return rows.map((r) => r.map((x) => x.trim()));
+}
+
+/** Meta Lead Ads: leadgen kimliğinden lead'i Graph'tan çekip içe al (webhook ve yeniden deneme işi kullanır) */
+export async function fetchMetaLead(integrationId: string, leadgenId: string) {
+  const [ig] = await ownerSql`select * from integrations where id = ${integrationId}`; if (!ig) return;
+  const r = await fetch(`${meta.graph}/${leadgenId}?fields=field_data,created_time,ad_name,adset_name,campaign_name,form_id`, { headers: { Authorization: `Bearer ${decrypt(ig.credentialsEnc)}` }, signal: AbortSignal.timeout(20_000) });
+  const lead = await r.json().catch(() => ({})) as any;
+  if (lead.error || !r.ok) throw new Error(`Meta: ${lead.error?.message ?? r.status}`);
+  await ingestLead(ig.clinicId, "meta", leadgenId, lead, { fieldMap: ig.config?.fieldMap, defaults: { source: "meta", campaign: lead.campaign_name, ownerId: ig.config?.ownerId } });
+  await ownerSql`update integrations set last_sync_at = now(), status = 'healthy', last_error = null where id = ${ig.id}`;
 }

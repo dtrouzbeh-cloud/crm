@@ -56,18 +56,25 @@ async function notifyOwner(ev: Ev) {
   await notifyUser(ev.clinicId, uid, ev.type, render(tpl, ev.payload), (ev.payload.link as string) ?? (ev.payload.leadId ? "/leads/" + ev.payload.leadId : null));
 }
 
+/** Kanca hatası: işlem sırasında silinen kayda bağlanma (FK 23503) beklenen bir yarıştır, sessiz geçilir */
+const hookErr = (name: string, type: string) => (e: any) => { if (e?.code !== "23503") console.error(name, type, e); };
 async function processOutbox(): Promise<number> {
   const evs = await ownerSql.begin(async (tx) => {
     const rows = await tx`select id, clinic_id, type, entity_id, payload from outbox_events where dispatched_at is null order by id limit 50 for update skip locked` as unknown as Ev[];
     for (const ev of rows) {
-      await runWorkflows(ev).catch((e) => console.error("workflow", ev.type, e));
-      await notifyOwner(ev).catch((e) => console.error("notify", e));
-      await pipelineHooks(ev).catch((e) => console.error("pipeline", ev.type, e));
-      await recallHooks(ev).catch((e) => console.error("recall", ev.type, e));
-      await aiHooks(ev).catch((e) => console.error("ai", ev.type, e));
-      await conversionHooks(ev).catch((e) => console.error("capi", ev.type, e));
-      await scoringHooks(ev).catch((e) => console.error("score", ev.type, e));
-      await sequenceHooks(ev).catch((e) => console.error("sequence", ev.type, e));
+      // olay işlenmeden lead silinmişse (ör. CSV içe aktarma geri alındı) iç kancalar atlanır; giden webhook yine kuyruğa girer
+      const lid = (ev.payload as any)?.leadId;
+      const gone = lid && !ev.type.endsWith(".deleted") && !(await tx`select 1 from leads where id = ${lid}`).length;
+      if (!gone) {
+      await runWorkflows(ev).catch(hookErr("workflow", ev.type));
+      await notifyOwner(ev).catch(hookErr("notify", ev.type));
+      await pipelineHooks(ev).catch(hookErr("pipeline", ev.type));
+      await recallHooks(ev).catch(hookErr("recall", ev.type));
+      await aiHooks(ev).catch(hookErr("ai", ev.type));
+      await conversionHooks(ev).catch(hookErr("capi", ev.type));
+      await scoringHooks(ev).catch(hookErr("score", ev.type));
+      await sequenceHooks(ev).catch(hookErr("sequence", ev.type));
+      }
       // giden webhook'lar ve entegrasyonlar için iş oluştur
       await tx`insert into jobs (clinic_id, type, payload) select ${ev.clinicId}, 'webhook.dispatch', ${tx.json({ eventId: ev.id } as never)}
                where exists (select 1 from webhook_endpoints w where w.clinic_id = ${ev.clinicId} and w.active and (w.events @> '{*}' or ${ev.type} = any(w.events)))`;
