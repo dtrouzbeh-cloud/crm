@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n.tsx";
 import { get, put, post } from "../../lib/api.ts";
 import { Spinner, toast, toastErr, confirmBox } from "../../components/ui.tsx";
 import { Icon } from "../../components/Icon.tsx";
+import { useVoice } from "../../components/Calls.tsx";
 
 const KEYS: { name: string; icon: string; fields: { k: string; ph: string; type?: string; opts?: string[] }[]; docs: string }[] = [
   { name: "anthropic", icon: "✨", fields: [{ k: "key", ph: "sk-ant-api03-…", type: "password" }], docs: "https://console.anthropic.com/settings/keys" },
@@ -16,10 +17,10 @@ const KEYS: { name: string; icon: string; fields: { k: string; ph: string; type?
 
 export default function SetupTab() {
   const { t, rel } = useT(); const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["setup"], queryFn: () => get("/api/setup") });
+  const { data } = useQuery({ queryKey: ["setup"], queryFn: () => get("/api/setup") }); const { data: voice } = useVoice();
   const [f, setF] = useState<Record<string, Record<string, string>>>({}); const [busy, setBusy] = useState(""); const [res, setRes] = useState<Record<string, { ok: boolean; message: string }>>({});
   if (!data) return <Spinner />;
-  const r = () => { qc.invalidateQueries({ queryKey: ["setup"] }); qc.invalidateQueries({ queryKey: ["ai-agent"] }); };
+  const r = () => { qc.invalidateQueries({ queryKey: ["setup"] }); qc.invalidateQueries({ queryKey: ["ai-agent"] }); qc.invalidateQueries({ queryKey: ["voice-config"] }); };
   const save = async (name: string) => { setBusy(name); try { await put(`/api/setup/keys/${name}`, f[name] ?? {}); setF({ ...f, [name]: {} }); r(); toast(t("saved")); } catch (e) { toastErr(e); } finally { setBusy(""); } };
   const test = async (name: string) => { setBusy(name + "t"); try { setRes({ ...res, [name]: await post(`/api/setup/keys/${name}/test`, {}) }); } catch (e) { toastErr(e); } finally { setBusy(""); } };
   const remove = async (name: string) => { if (!(await confirmBox(t("remove"), t("key_" + name), t("remove"), true))) return; await put(`/api/setup/keys/${name}`, { remove: true }); r(); };
@@ -39,6 +40,7 @@ export default function SetupTab() {
             <button className="btn sm pri" disabled={busy === K.name || !Object.values(f[K.name] ?? {}).some((v) => v && !["openai", "deepgram", "elevenlabs"].includes(v))} onClick={() => save(K.name)}>{t("save")}</button>
             {configured && <button className="btn sm" disabled={busy === K.name + "t"} onClick={() => test(K.name)}>{busy === K.name + "t" ? "…" : t("test_connection")}</button>}
             {st.clinic && <button className="btn sm ghost danger" onClick={() => remove(K.name)}><Icon n="trash" /></button>}</div>
+          {K.name === "twilio" && st.clinic && voice?.inboundUrl && <div className="tiny muted">{t("voice_inbound_hint")}<div className="code" style={{ userSelect: "all", marginTop: 4 }}>{voice.inboundUrl}</div>{!voice.myPhone && <div style={{ color: "var(--warn)", marginTop: 4 }}>⚠️ {t("voice_need_my_phone")}</div>}</div>}
           {res[K.name] && <div className={"alert " + (res[K.name]!.ok ? "ok" : "err")} style={{ padding: "6px 10px" }}><span className="small">{res[K.name]!.ok ? "✓ " : "✕ "}{res[K.name]!.message}</span></div>}
         </div>; })}</div>
       <div className="card"><div className="hd"><h3 className="grow">✅ {t("setup_checklist")}</h3><span className="bdg brand">{done}/{total}</span></div>

@@ -34,6 +34,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.get("/api/files/:id", async (req, reply) => {
     const c = ctx(req);
     const { id } = req.params as { id: string };
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound("Dosya");
     const [f] = await withClinic(c.clinicId, (tx) => tx`select * from files where id = ${id}`);
     if (!f) throw notFound("Dosya");
     if (["passport", "ticket"].includes(f.kind) && c.perms["field.passport"] === "hide") throw new HttpError(403, "forbidden");

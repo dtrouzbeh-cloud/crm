@@ -28,7 +28,7 @@ export async function buildServer() {
   // public sayfalar (IP + belge başına 120/dk). Meta/ödeme webhook'ları ve oturum kontrolü sınırlanmaz: aynı ofisteki
   // ekip tek IP'den çıkar, Meta da yoğun anlarda tek IP'den yüzlerce durum bildirimi gönderir.
   const hits = new Map<string, { n: number; t: number }>();
-  const WEBHOOK = /^\/api\/public\/(wa\/webhook|meta\/|in\/|pay\/|billing\/)/;
+  const WEBHOOK = /^\/api\/public\/(wa\/webhook|meta\/|in\/|pay\/|billing\/|voice\/)/;
   app.addHook("onRequest", async (req) => {
     const u = req.url.split("?")[0]!;
     let limit = 0, key = "";
@@ -48,6 +48,7 @@ export async function buildServer() {
     const e = err as { statusCode?: number; code?: string; message: string };
     if (e.statusCode && e.statusCode < 500) return reply.status(e.statusCode).send({ error: e.code ?? "bad_request", message: e.message });
     if (e.code === "23505") return reply.status(409).send({ error: "conflict", message: "Kayıt zaten mevcut" });
+    if (e.code === "22P02") return reply.status(404).send({ error: "not_found", message: "Kayıt bulunamadı" });   // geçersiz kimlik biçimi (ör. /api/leads/abc)
     req.log.error(err);
     return reply.status(500).send({ error: "server_error", message: "Beklenmeyen bir hata oluştu" });
   });

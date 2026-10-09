@@ -14,6 +14,7 @@ const MAP: [RegExp, string[][]][] = [
   [/^task\./, [["tasks"], ["taskcounts"]]],
   [/^form\./, [["forms"], ["lead"]]],
   [/^visit\./, [["deals"], ["interp"]]],
+  [/^call\./, [["calls"], ["lead"], ["tasks"], ["taskcounts"]]],
 ];
 
 let prefsCache: { browser?: boolean; sound?: boolean } | null = null;

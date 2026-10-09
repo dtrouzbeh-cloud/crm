@@ -34,7 +34,7 @@ test("dizi: şablon → olayla kayıt → WhatsApp işi + görev → cevapla dur
   await drain();
   const [e] = await ownerSql`select * from sequence_enrollments where lead_id = ${l.body.leadId}`; assert.ok(e, "otomatik kayıt"); assert.equal(e.status, "active");
   // adım 0: pencere kapalı → onaylı şablonla gönderim işi
-  assert.equal(await runDueSequences(), 1);
+  assert.ok(await runDueSequences() >= 1);   // paylaşılan test veritabanında başka kliniklerin vadesi gelmiş kayıtları da işlenebilir; aşağıda bu kaydın işi doğrulanır
   const [job] = await ownerSql`select payload from jobs where type = 'sequence.wa' and dedupe_key like ${"seq:" + e.id + "%"}`;
   assert.equal((job!.payload as any).kind, "template"); assert.deepEqual((job!.payload as any).template.params, ["Seq", me.clinic.name]);
   // adım 1: görev (60 dk) — zamanı öne al

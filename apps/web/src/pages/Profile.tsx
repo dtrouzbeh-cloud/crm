@@ -5,6 +5,7 @@ import { useT } from "../lib/i18n.tsx";
 import { get, post, put } from "../lib/api.ts";
 import { PageHead, Spinner, toast, toastErr, Switch } from "../components/ui.tsx";
 import { useMe, useInvalidateMe } from "../lib/auth.ts";
+import { MyPhoneCard } from "../components/Calls.tsx";
 
 export default function Profile() {
   const { t, rel } = useT(); const { data: me } = useMe(); const inv = useInvalidateMe(); const qc = useQueryClient();
@@ -13,6 +14,7 @@ export default function Profile() {
   if (!me?.user) return <Spinner />;
   return <><PageHead title={t("profile")} sub={me.user.email} />
     <div className="grid g2" style={{ alignItems: "start" }}>
+      <MyPhoneCard />
       <div className="card"><div className="hd"><h2 className="grow">{t("mfa_title")}</h2><span className={"bdg " + (me.user.mfaEnabled ? "ok" : "warn")}>{t(me.user.mfaEnabled ? "mfa_on" : "mfa_off")}</span></div><div className="bd col">
         {!me.user.mfaEnabled && !mfa && <button className="btn pri" style={{ alignSelf: "flex-start" }} onClick={async () => setMfa(await post("/api/auth/mfa/setup"))}>{t("mfa_enable")}</button>}
         {mfa && <><p className="small muted" style={{ margin: 0 }}>{t("mfa_scan")}</p><div className="code" style={{ fontSize: 15, letterSpacing: ".1em" }}>{mfa.secret}</div><a className="small" href={mfa.uri}>otpauth:// →</a>

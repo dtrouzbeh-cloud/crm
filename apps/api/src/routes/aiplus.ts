@@ -1,5 +1,6 @@
 // AI+ API: canlı koç, çeviri, itiraz raporu, arama listesi, canlı teklifler, fotoğraf ön değerlendirme, kayıp analizi, konuşma karnesi, benzer vakalar; Kurulum (anahtarlar + kontrol listesi)
 import type { FastifyInstance } from "fastify";
+import { normalizePhone } from "@dentaflow/core/phone";
 import { z } from "zod";
 import { withClinic, ownerSql } from "../db.ts";
 import { ctx, need, parse, notFound, HttpError, forbidden, qbool } from "../http.ts";
@@ -159,7 +160,7 @@ export function aiPlusRoutes(app: FastifyInstance) {
     });
   });
   const KEY_BODY = z.object({ key: z.string().trim().min(8).max(400).optional(), provider: z.enum(["openai", "deepgram", "elevenlabs"]).optional(), from: z.string().trim().max(200).optional(),
-    sid: z.string().trim().regex(/^AC[a-f0-9]{32}$/i, "Geçersiz Account SID").optional(), token: z.string().trim().min(16).max(200).optional(), number: z.string().trim().regex(/^\+\d{8,15}$/, "Numara +90… biçiminde olmalı").optional(), remove: z.boolean().optional() });
+    sid: z.string().trim().regex(/^AC[a-f0-9]{32}$/i, "Geçersiz Account SID").optional(), token: z.string().trim().min(16).max(200).optional(), number: z.string().trim().regex(/^[+\d][\d ()-]{7,24}$/, "Numara +90… biçiminde olmalı").optional(), remove: z.boolean().optional() });
   app.put("/api/setup/keys/:name", async (req) => {
     const c = need(ctx(req), "settings.manage"); const { name } = req.params as { name: SecretName }; const b = parse(KEY_BODY, req.body);
     if (!["anthropic", "stt", "resend", "twilio"].includes(name)) throw notFound("Anahtar");
@@ -167,7 +168,7 @@ export function aiPlusRoutes(app: FastifyInstance) {
     else if (name === "anthropic") { if (!/^sk-ant-/.test(b.key ?? "")) throw new HttpError(400, "bad_key", "Claude anahtarı sk-ant- ile başlamalı"); await setSecret(c.clinicId, name, { key: b.key! }, {}, c.userId); }
     else if (name === "stt") { if (!b.key) throw new HttpError(400, "key_required", "Anahtar gerekli"); await setSecret(c.clinicId, name, { key: b.key }, { provider: b.provider ?? "openai" }, c.userId); }
     else if (name === "resend") { if (!/^re_/.test(b.key ?? "")) throw new HttpError(400, "bad_key", "Resend anahtarı re_ ile başlamalı"); if (b.from && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.from)) throw new HttpError(400, "bad_from", "Gönderen adres geçersiz"); await setSecret(c.clinicId, name, { key: b.key! }, { from: b.from ?? null }, c.userId); }
-    else { if (!b.sid || !b.token) throw new HttpError(400, "key_required", "Account SID ve Auth Token gerekli"); await setSecret(c.clinicId, name, { sid: b.sid, token: b.token }, { number: b.number ?? null, sidMasked: b.sid.slice(0, 6) + "…" + b.sid.slice(-4) }, c.userId); }
+    else { if (!b.sid || !b.token) throw new HttpError(400, "key_required", "Account SID ve Auth Token gerekli"); if (!/^AC[0-9a-fA-F]{32}$/.test(b.sid)) throw new HttpError(400, "bad_sid", "Account SID AC ile başlayan 34 karakter olmalı"); const num = normalizePhone(b.number ?? null); if (!num) throw new HttpError(400, "bad_number", "Twilio numarası uluslararası biçimde olmalı (+90…)"); await setSecret(c.clinicId, name, { sid: b.sid, token: b.token }, { number: num, sidMasked: b.sid.slice(0, 6) + "…" + b.sid.slice(-4) }, c.userId); }
     await withClinic(c.clinicId, (tx) => audit(tx, c, b.remove ? "setup.key.remove" : "setup.key.set", "secret", null, { name }));
     return { ok: true };
   });

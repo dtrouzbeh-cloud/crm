@@ -11,7 +11,7 @@ Test örneği ayrı veritabanı (`dentaflow_e2e`), ayrı klasör (`/opt/dentaflo
 
 ```bash
 rsync -a --delete --exclude node_modules --exclude .git --exclude .env ./ root@SUNUCU:/opt/dentaflow/e2e-app/
-ssh root@SUNUCU 'E2E_APP=/opt/dentaflow/e2e-app bash /opt/dentaflow/e2e-app/scripts/e2e/run.sh /tmp/opg.jpg'
+ssh root@SUNUCU 'E2E_APP=/opt/dentaflow/e2e-app bash /opt/dentaflow/e2e-app/scripts/e2e/run.sh /opt/dentaflow/e2e-assets/opg.jpg'
 ```
 
 - Rapor: `/tmp/df-e2e/report.json`; API ve işçi günlükleri aynı klasörde.

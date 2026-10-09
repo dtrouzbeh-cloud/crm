@@ -16,6 +16,7 @@ import { CustomFieldsCard } from "./settings/Fields.tsx";
 import { SequencesCard, ConsentCard, AiSummaryCard, ReferralCard } from "../components/LeadAutomation.tsx";
 import { LeadRecallsCard } from "../components/Recalls.tsx";
 import { ComplaintsCard } from "../components/ClinicalPanels.tsx";
+import { CallButton, CallsCard } from "../components/Calls.tsx";
 
 const MED = ["diabetes", "anticoag", "bisph", "pregnant", "chemo", "smoker", "heart", "allergy"];
 
@@ -50,7 +51,7 @@ export default function LeadDetail() {
         <div className="row wrap small muted" style={{ marginTop: 4, gap: 10 }}><span>{flag(l.country)} {l.country}</span><span>{LANG_NAMES[l.language] ?? l.language ?? ""}</span><span>{t("src_" + l.source)}</span><span>{t("created")} {rel(l.createdAt)}</span>
           {med?.flags?.length ? <span className="bdg err"><Icon n="alert" size={12} /> {med.flags.map((f: string) => t("med_" + f)).join(", ")}</span> : null}</div></div>
       <ScoreBadge score={l.score} reasons={l.scoreReasons} /><select className="inp" style={{ width: "auto" }} value={l.stage} disabled={!can("lead.write")} onChange={(e) => e.target.value === "lost" ? setLost(true) : save({ stage: e.target.value })}>{(salesStageOrder().includes(l.stage) ? salesStageOrder() : [...salesStageOrder(), l.stage]).map((s) => <option key={s} value={s}>{stageLabel(t, s)}</option>)}</select>
-      {phoneOk && <><a className="btn" href={`tel:${l.phone}`}><Icon n="phone" />{t("call")}</a><button className="btn" style={{ color: "#16A34A" }} onClick={async () => { try { const r = await post("/api/inbox/start", { leadId: id }); nav(`/inbox/${r.id}`); } catch { window.open(`https://wa.me/${l.phone.replace(/\D/g, "")}`, "_blank"); } }}><Icon n="wa" />WhatsApp</button></>}
+      {phoneOk && <><CallButton leadId={id} phone={l.phone} /><button className="btn" style={{ color: "#16A34A" }} onClick={async () => { try { const r = await post("/api/inbox/start", { leadId: id }); nav(`/inbox/${r.id}`); } catch { window.open(`https://wa.me/${l.phone.replace(/\D/g, "")}`, "_blank"); } }}><Icon n="wa" />WhatsApp</button></>}
       {openCaseObj ? <Link className="btn pri" href={`/cases/${openCaseObj.id}`}><Icon n="tooth" />{t("go_case")}</Link> : can("case.write") && <button className="btn pri" onClick={openCase}><Icon n="tooth" />{t("open_case")}</button>}
     </div></div>
     <div className="grid ldgrid" style={{ gridTemplateColumns: "minmax(0,1.15fr) minmax(0,1fr)", alignItems: "start" }} id="ldGrid">
@@ -77,6 +78,7 @@ export default function LeadDetail() {
       <div className="col" style={{ gap: 14 }}>
         <div className="card"><div className="hd"><h2 className="grow">{t("nav_tasks")}</h2><button className="btn sm" onClick={() => setAddTask(true)}><Icon n="plus" /></button></div><div className="bd" style={{ paddingTop: 0, paddingBottom: 0 }}>
           <div className="tlist">{data.tasks.length ? data.tasks.map((x: any) => <TaskRow key={x.id} task={{ ...x, leadId: null }} />) : <div className="empty small">{t("no_tasks")}</div>}</div></div></div>
+        <CallsCard leadId={id} />
         {cases?.length ? <div className="card"><div className="hd"><h2 className="grow">{t("case")}</h2></div><div className="bd col">{cases.map((c: any) => <Link key={c.id} href={`/cases/${c.id}`} className="row" style={{ color: "inherit" }}><b>#{c.number}</b><span className="grow small muted">{rel(c.createdAt)}</span><CaseBadge s={c.status} />{c.lastQuote && <QuoteBadge s={c.lastQuote.status} />}</Link>)}</div></div>
           : can("case.write") && <div className="card pad"><p className="small muted" style={{ margin: "0 0 10px" }}>{t("open_case_hint")}</p><button className="btn pri" onClick={openCase}><Icon n="tooth" />{t("open_case")}</button></div>}
         <FormsCard leadId={id} email={l.email} phone={l.phone} />

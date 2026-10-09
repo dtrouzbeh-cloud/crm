@@ -92,6 +92,18 @@ async function main() {
     return providerRejected(exp(await A.post("/api/setup/keys/twilio/test"), 200, "test"), /401|authenticat|credentials/i);
   }, "Twilio");
 
+  await step("Tek tık arama: Twilio'ya gerçek arama isteği, hata temsilciye net dönüyor", "canlı", async () => {
+    exp(await A.put("/api/me/phone", { phone: "+90 532 000 00 00" }), 200, "my phone");
+    const l = exp(await A.post("/api/leads", { fullName: "Call Test", phone: "+447700" + rnd(6), country: "GB" }), 200, "lead");
+    const r = await A.post(`/api/leads/${l.leadId}/call`); ok(r.status === 502 && /Twilio 40[13]/.test(r.body?.message ?? ""), `${r.status} ${r.text.slice(0, 200)}`);
+    const calls = exp(await A.get(`/api/leads/${l.leadId}/calls`), 200, "calls"); ok(calls[0]?.status === "failed" && calls[0]?.error, "başarısız arama kaydı yok");
+    const cfg = exp(await A.get("/api/voice/config"), 200, "cfg"); ok(/\/api\/public\/voice\/inbound$/.test(cfg.inboundUrl), cfg.inboundUrl);
+    return r.body.message;
+  }, "Twilio");
+  await step("Gelen arama webhook'u: imzasız istek reddediliyor", "iç", async () => {
+    const r = await A.post("/api/public/voice/inbound", "From=%2B447700900123&To=%2B447700900000&CallSid=CA1", { "content-type": "application/x-www-form-urlencoded" }); ok(r.status === 403, `${r.status}`); return "403";
+  }, "Twilio");
+
   G("A5. Ödeme sağlayıcıları (sandbox)");
   for (const [prov, cfg, re] of [["stripe", { secretKey: "sk_test_" + "x".repeat(24), webhookSecret: "whsec_e2e_" + RUN }, /Stripe 401|invalid api key/i],
     ["iyzico", { apiKey: "sandbox-" + "x".repeat(24), secretKey: "sandbox-" + "y".repeat(24) }, /iyzico/i],

@@ -226,7 +226,7 @@ lab_orders, implant_records, warranties, complaints               -- klinik mod�
 13. Dizilere "AI adımı"
 
 ### Faz D — Ses
-14. Temsilci için tarayıcıdan arama + kayıt + AI özeti
+14. ✅ Temsilci tek tık arama (Twilio köprü: önce temsilci, sonra hasta) + kayıt + döküm + AI özet/sonuç/sonraki adım; gelen arama → temsilciler → cevapsız → sesli mesaj + geri arama görevi (2026-10-09). Tarayıcıdan WebRTC arama sonraki adım.
 15. AI giden arama (speed-to-lead, takip, recall, teyit)
 16. AI gelen arama (mesai dışı), arama takibi numaraları
 

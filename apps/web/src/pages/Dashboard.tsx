@@ -51,6 +51,7 @@ export default function Dashboard() {
 export function eventText(t: (k: string, p?: any) => string, e: { type: string; body?: string; data?: any }) {
   if (e.type === "stage") { const [f, to] = String(e.body).split("→"); return `${stageLabel(t, f!)} → ${stageLabel(t, to!)}`; }
   if (e.type === "system" && e.body === "created") return t("act_created", { x: t("src_" + (e.data?.source ?? "manual")) });
+  if (e.type === "system" && e.body) { const k = "sys_" + e.body; if (t(k) !== k) return t(k) + (e.data?.title ? `: ${e.data.title}` : e.data?.category ? `: ${t("cc_" + e.data.category) !== "cc_" + e.data.category ? t("cc_" + e.data.category) : e.data.category}` : ""); }
   if (e.type === "quote") return `${t("quote")}: ${e.body === "sent" ? t("qs_sent") : e.body === "viewed" ? t("qs_viewed") : e.body === "accept" ? t("qs_accepted") : e.body === "changes" ? t("qs_changes") : e.body === "decline" ? t("qs_declined") : e.body}`;
   if (e.type === "case") return `${t("case")}: ${e.body === "opened" ? t("act_case") : e.body === "diagnosed" ? t("cs_diagnosed") : e.body}`;
   if (e.type === "deal") return t("act_deal");

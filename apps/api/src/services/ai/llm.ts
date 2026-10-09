@@ -51,6 +51,7 @@ const MOCK_FORCED: Record<string, any> = {
       { label: "Kapanış", text: "We have availability next month. If you send your photos today, you'll have your plan by tomorrow.", gloss: "Önümüzdeki ay müsaitiz. Bugün fotoğraf gönderirseniz planınız yarın hazır." }],
     lead: { interest: "All-on-4", temperature: "warm" } },
   assess_output: { summary: "Üst çenede çoklu eksik diş; alt ön bölgede çürük şüphesi.", image_quality: "ok", confidence: "medium", findings: [{ tooth: 16, status: "missing" }, { tooth: 15, status: "missing" }, { tooth: 31, status: "caries" }], suggestions: ["Üst çene için implant destekli sabit protez değerlendirilebilir"], needs: ["Panoramik röntgen"] },
+  call_output: { summary: "Hasta üst çene All-on-4 ile ilgileniyor; Mart ayında gelmek istiyor, fiyatı eşiyle konuşacak.", outcome: "callback", next_step: "Cuma günü tekrar ara ve panoramik röntgen iste", next_step_in_hours: 48, objection: "family", lead: { interest: "All-on-4 üst", travelWindow: "Mart", temperature: "warm" } },
   qa_output: { score: 72, strengths: ["Hızlı ilk yanıt"], improvements: ["Fotoğraf istemeyi unutmuş"], criteria: { speed: 4, discovery: 3, photos: 2, follow_up: 3, tone: 5, closing: 3 }, summary: "Genel olarak iyi; keşif soruları artırılmalı." },
 };
 function mock(o: { messages: Msg[]; tools?: Tool[]; toolChoice?: string; system?: string }): LlmResult {
