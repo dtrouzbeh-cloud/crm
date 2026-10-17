@@ -46,4 +46,19 @@ npm test
 ```
 
 ## CI
-`ci/github-actions.yml` hazır. GitHub erişim anahtarında `workflow` yetkisi olmadığı için `.github/workflows/ci.yml` olarak gönderilemedi. Etkinleştirmek için dosyayı GitHub web arayüzünden `.github/workflows/ci.yml` olarak ekleyin ya da `gh auth refresh -s workflow` çalıştırıp taşıyın.
+`.github/workflows/ci.yml` her push ve PR'da migration, tip kontrolü, testler ve derlemeyi çalıştırır.
+
+## GitHub Actions ile dağıtım (Tailscale)
+`.github/workflows/deploy.yml` yalnızca elle tetiklenir: GitHub → Actions → Deploy → Run workflow (main dalı). Runner Tailscale ile tailnet'e geçici olarak katılır ve `scripts/deploy.sh`'ı çalıştırır; böylece bilgisayar kapalıyken telefondan da dağıtım yapılabilir.
+
+Kurulum:
+1. Tailscale yönetim panelinde ACL'e `tag:ci` etiketini ekleyin (`tagOwners`) ve bu etikete yalnızca sunucunun 22 portuna erişim verin.
+2. Tailscale → Settings → OAuth clients'ta `auth_keys` yazma yetkili, `tag:ci` etiketli bir OAuth client oluşturun.
+3. GitHub → Settings → Environments'ta `production` ortamını oluşturun (isterseniz "Required reviewers" ile onay şartı koyun) ve şu secret'ları ekleyin:
+
+| Secret | Değer |
+|---|---|
+| `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` | 2. adımdaki OAuth client |
+| `DEPLOY_HOST` | `root@<sunucunun Tailscale adı veya 100.x IP'si>` |
+| `DEPLOY_SSH_KEY` | Yalnızca dağıtım için üretilmiş özel anahtar (`ssh-keygen -t ed25519 -f deploy_key`); açık anahtarı sunucuda `authorized_keys`'e ekleyin |
+| `DEPLOY_KNOWN_HOSTS` | Tailnet'e bağlı bir makinede `ssh-keyscan <sunucunun Tailscale adı>` çıktısı |
